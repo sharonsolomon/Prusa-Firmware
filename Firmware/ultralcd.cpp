@@ -4181,11 +4181,13 @@ void lcd_wizard(WizState state)
 			break;
 		case S::Z:
 			lcd_show_fullscreen_message_and_wait_P(_i("Please remove shipping helpers first."));////MSG_REMOVE_SHIPPING_HELPERS c=20 r=3
-			lcd_show_fullscreen_message_and_wait_P(_i("Now remove the test print from steel sheet."));////MSG_REMOVE_TEST_PRINT c=20 r=4
+		#ifdef STEEL_SHEET
+            lcd_show_fullscreen_message_and_wait_P(_i("Now remove the test print from steel sheet."));////MSG_REMOVE_TEST_PRINT c=20 r=4
 			wizard_event = lcd_show_fullscreen_message_yes_no_and_wait_P(_T(MSG_STEEL_SHEET_CHECK), false);
 			if (wizard_event == LCD_MIDDLE_BUTTON_CHOICE) {
 				lcd_show_fullscreen_message_and_wait_P(_T(MSG_PLACE_STEEL_SHEET));
 			}
+        #endif
 			lcd_show_fullscreen_message_and_wait_P(_i("I will run z calibration now."));////MSG_WIZARD_Z_CAL c=20 r=8
 			wizard_event = gcode_M45(true, 0);
 			if (!wizard_event) {
@@ -4832,7 +4834,7 @@ static void select_sheet_menu()
     selected_sheet = number;
     lcd_sheet_menu();
 }
-
+#ifdef STEEL_SHEET
 static void sheets_menu()
 {
     MENU_BEGIN();
@@ -4847,7 +4849,7 @@ static void sheets_menu()
     MENU_ITEM_SUBMENU_E(EEPROM_Sheets_base->s[7], select_sheet_menu<7>);
     MENU_END();
 }
-
+#endif
 static void nozzle_change()
 {
     lcd_commands_type = LcdCommands::NozzleCNG;
@@ -4878,8 +4880,9 @@ void lcd_hw_setup_menu(void)                      // can not be "static"
 
     MENU_BEGIN();
     MENU_ITEM_BACK_P(_T(bSettings?MSG_SETTINGS:MSG_BACK)); // i.e. default menu-item / menu-item after checking mismatch
-
+#ifdef STEEL_SHEET
     MENU_ITEM_SUBMENU_P(_T(MSG_STEEL_SHEETS), sheets_menu);
+#endif
     SETTINGS_NOZZLE;
     MENU_ITEM_FUNCTION_P(_T(MSG_NOZZLE_CNG_MENU),nozzle_change);
     MENU_ITEM_SUBMENU_P(_i("Checks"), lcd_checking_menu);  ////MSG_CHECKS c=18
@@ -5535,6 +5538,7 @@ static void activate_calibrate_sheet()
     lcd_first_layer_calibration_reset();
 }
 
+#ifdef STEEL_SHEET
 static void lcd_sheet_menu()
 {
     MENU_BEGIN();
@@ -5553,6 +5557,7 @@ static void lcd_sheet_menu()
 
     MENU_END();
 }
+#endif
 
 //! @brief Show Main Menu
 //!

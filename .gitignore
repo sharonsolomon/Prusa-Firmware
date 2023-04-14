@@ -5,7 +5,6 @@
 /.vscode
 
 # Temporary configuration
-/Firmware/Configuration_prusa.h
 
 # Temporary language files
 /lang/po/*.mo
@@ -20,7 +19,18 @@
 *.bak
 .DS_Store
 __pycache__
+CMakeCache.txt
+
 
 # Generated files
 /build-env/
 /Firmware/Doc/
+/Firmware/.vscode
+/Firmware/libraries
+/libraries
+/build
+/build_gen
+/CMakeFiles
+cmake_install.cmake
+
+build.ninja

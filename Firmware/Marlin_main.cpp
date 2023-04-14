@@ -3424,12 +3424,12 @@ bool gcode_M45(bool onlyZ, int8_t verbosity_level)
 				current_position[Z_AXIS] = MESH_HOME_Z_SEARCH;
 				plan_buffer_line_curposXYZE(homing_feedrate[Z_AXIS] / 40);
 				st_synchronize();
-//#ifndef NEW_XYZCAL
+
 				if (result >= 0)
 				{
-					#ifdef HEATBED_V2
+					#ifdef NEW_XYZCAL
 					sample_z();
-					#else //HEATBED_V2
+					#else //NEW_XYZCAL
 					point_too_far_mask = 0;
 					// Second half: The fine adjustment.
 					// Let the planner use the uncorrected coordinates.
@@ -3445,9 +3445,9 @@ bool gcode_M45(bool onlyZ, int8_t verbosity_level)
 					plan_buffer_line_curposXYZE(homing_feedrate[Z_AXIS] / 40);
 					st_synchronize();
 					// if (result >= 0) babystep_apply();					
-					#endif //HEATBED_V2
+					#endif //NEW_XYZCAL
 				}
-//#endif //NEW_XYZCAL
+
 				lcd_update_enable(true);
 				lcd_update(2);
 
@@ -4928,6 +4928,7 @@ eeprom_update_word((uint16_t*)EEPROM_NOZZLE_DIAMETER_uM,0xFFFF);
             break;
         }
         lcd_show_fullscreen_message_and_wait_P(_i("Stable ambient temperature 21-26C is needed a rigid stand is required."));////MSG_TEMP_CAL_WARNING c=20 r=4
+      #ifdef STEEL_SHEET
         bool result = lcd_show_fullscreen_message_yes_no_and_wait_P(_T(MSG_STEEL_SHEET_CHECK), false, false);
 
         if (result)
@@ -4946,6 +4947,7 @@ eeprom_update_word((uint16_t*)EEPROM_NOZZLE_DIAMETER_uM,0xFFFF);
             gcode_G28(false, false, true);
 
         }
+      #endif
         if ((current_temperature_pinda > 35) && (farm_mode == false)) {
             //waiting for PIDNA probe to cool down in case that we are not in farm mode
             current_position[Z_AXIS] = 100;

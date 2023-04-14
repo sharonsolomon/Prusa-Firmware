@@ -63,7 +63,9 @@ extern const char MSG_M117_V2_CALIBRATION[];
 extern const char MSG_MAIN[];
 extern const char MSG_BACK[];
 extern const char MSG_SHEET[];
+#ifdef STEEL_SHEET
 extern const char MSG_STEEL_SHEETS[];
+#endif
 extern const char MSG_MEASURE_BED_REFERENCE_HEIGHT_LINE1[];
 extern const char MSG_CALIBRATION[];
 extern const char MSG_MMU_FAILS[];
@@ -72,7 +74,9 @@ extern const char MSG_NO[];
 extern const char MSG_NOZZLE[];
 extern const char MSG_PAPER[];
 extern const char MSG_PAUSE_PRINT[];
+#ifdef STEEL_SHEET
 extern const char MSG_PLACE_STEEL_SHEET[];
+#endif
 extern const char MSG_PLEASE_WAIT[];
 extern const char MSG_POWER_FAILURES[];
 extern const char MSG_PREHEAT_NOZZLE[];
@@ -81,7 +85,9 @@ extern const char MSG_PRINT_ABORTED[];
 extern const char MSG_PULL_OUT_FILAMENT[];
 extern const char MSG_RECOVER_PRINT[];
 extern const char MSG_REFRESH[];
+#ifdef STEEL_SHEET
 extern const char MSG_REMOVE_STEEL_SHEET[];
+#endif
 extern const char MSG_RESET[];
 extern const char MSG_RESUME_PRINT[];
 extern const char MSG_RESUMING_PRINT[];
@@ -108,7 +114,9 @@ extern const char MSG_AUTO_POWER[];
 extern const char MSG_SILENT[];
 extern const char MSG_NORMAL[];
 extern const char MSG_STEALTH[];
+#ifdef STEEL_SHEET
 extern const char MSG_STEEL_SHEET_CHECK[];
+#endif
 extern const char MSG_STOP_PRINT[];
 extern const char MSG_STOPPED[];
 extern const char MSG_PINDA_CALIBRATION[];

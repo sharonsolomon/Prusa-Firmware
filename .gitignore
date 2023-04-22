@@ -10,7 +10,7 @@
 /compile_commands.json
 
 # Temporary configuration
-/Firmware/Configuration_prusa.h
+#/Firmware/Configuration_prusa.h
 
 # Temporary language files
 /lang/po/*.mo

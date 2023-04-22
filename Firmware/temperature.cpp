@@ -44,7 +44,7 @@
 #include "adc.h"
 #include "ConfigurationStore.h"
 #include "Timer.h"
-#include "Configuration_var.h"
+#include "Configuration_prusa.h"
 #include "Prusa_farm.h"
 
 #if (ADC_OVRSAMPL != OVERSAMPLENR)
@@ -97,8 +97,6 @@
 #include "temp_model.h"
 #endif
 
-#include "Filament_sensor.h"
-
 //===========================================================================
 //=============================public variables============================
 //===========================================================================
@@ -124,6 +122,10 @@ int current_voltage_raw_pwr = 0;
 #ifdef VOLT_BED_PIN
 int current_voltage_raw_bed = 0;
 #endif
+
+#ifdef IR_SENSOR_ANALOG
+uint16_t current_voltage_raw_IR = 0;
+#endif //IR_SENSOR_ANALOG
 
 int current_temperature_bed_raw = 0;
 float current_temperature_bed = 0.0;
@@ -1184,7 +1186,7 @@ FORCE_INLINE static void applyBabysteps() {
     int curTodo=babystepsTodo[axis]; //get rid of volatile for performance
 
     if(curTodo>0)
-{
+    {
       ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
         babystep(axis,/*fwd*/true);
         babystepsTodo[axis]--; //less to do next time
@@ -1232,7 +1234,11 @@ FORCE_INLINE static void soft_pwm_core()
   static unsigned char state_timer_heater_b = 0;
 #endif
 #endif
-
+  
+#if defined(FILWIDTH_PIN) &&(FILWIDTH_PIN > -1)
+  static unsigned long raw_filwidth_value = 0;  //added for filament width sensor
+#endif
+  
 #ifndef SLOW_PWM_HEATERS
   /*
    * standard PWM modulation
@@ -2209,7 +2215,7 @@ ISR(TIMERx_COMPA_vect)
 
 void disable_heater()
 {
-  setTargetHotend(0);
+  setAllTargetHotends(0);
   setTargetBed(0);
 
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {

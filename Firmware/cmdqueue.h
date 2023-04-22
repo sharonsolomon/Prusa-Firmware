@@ -61,10 +61,6 @@ extern void cmdqueue_dump_to_serial_single_line(int nr, const char *p);
 extern void cmdqueue_dump_to_serial();
 #endif /* CMDBUFFER_DEBUG */
 extern bool cmd_buffer_empty();
-
-/// @brief Variant of enquecommand which accepts a format string
-/// @param fmt a format string residing in PROGMEM
-void enquecommandf_P(const char *fmt, ...);
 extern void enquecommand(const char *cmd, bool from_progmem = false);
 extern void enquecommand_front(const char *cmd, bool from_progmem = false);
 extern void repeatcommand_front();
@@ -78,5 +74,16 @@ static inline float   code_value()      { return strtod(strchr_pointer+1, NULL);
 static inline long    code_value_long()    { return strtol(strchr_pointer+1, NULL, 10); }
 static inline int16_t code_value_short()   { return int16_t(strtol(strchr_pointer+1, NULL, 10)); };
 static inline uint8_t code_value_uint8()   { return uint8_t(strtol(strchr_pointer+1, NULL, 10)); };
+
+static inline float code_value_float()
+{
+    char* e = strchr(strchr_pointer, 'E');
+    if (!e) return strtod(strchr_pointer + 1, NULL);
+    *e = 0;
+    float ret = strtod(strchr_pointer + 1, NULL);
+    *e = 'E';
+    return ret;
+}
+
 
 #endif //CMDQUEUE_H

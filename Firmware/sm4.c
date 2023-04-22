@@ -9,7 +9,7 @@
 #include "boards.h"
 #define false 0
 #define true 1
-#include "Configuration_var.h"
+#include "Configuration_prusa.h"
 
 
 #ifdef NEW_XYZCAL

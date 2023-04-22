@@ -21,9 +21,8 @@ typedef struct
     //Variables used when editing values.
     const char* editLabel;
     void* editValue;
-    int16_t currentValue;
-    int16_t minEditValue;
-    int16_t maxEditValue;
+    int32_t minEditValue;
+    int32_t maxEditValue;
 } menu_data_edit_t;
 
 extern uint8_t menu_data[MENU_DATA_SIZE];
@@ -57,7 +56,9 @@ extern uint8_t menu_row;
 
 //scroll offset in the current menu
 extern uint8_t menu_top;
+
 extern uint8_t menu_clicked;
+
 extern uint8_t menu_leaving;
 
 //function pointer to the currently active menu
@@ -65,7 +66,7 @@ extern menu_func_t menu_menu;
 
 extern void menu_data_reset(void);
 
-extern void menu_goto(menu_func_t menu, const int16_t encoder, bool reset_menu_state, const bool feedback=false);
+extern void menu_goto(menu_func_t menu, const uint32_t encoder, const bool feedback, bool reset_menu_state);
 
 #define MENU_BEGIN() menu_start(); for(menu_row = 0; menu_row < LCD_HEIGHT; menu_row++, menu_line++) { menu_item = 0;
 void menu_start(void);
@@ -79,8 +80,10 @@ extern void menu_back(uint8_t nLevel);
 
 extern void menu_back_if_clicked(void);
 
-extern void menu_submenu(menu_func_t submenu, const bool feedback=false);
-extern void menu_submenu_no_reset(menu_func_t submenu, const bool feedback=false);
+extern void menu_back_if_clicked_fb(void);
+
+extern void menu_submenu(menu_func_t submenu);
+extern void menu_submenu_no_reset(menu_func_t submenu);
 
 extern uint8_t menu_item_ret(void);
 
@@ -146,9 +149,6 @@ extern void menu_format_sheet_E(const Sheet &sheet_E, SheetFormatBuffer &buffer)
 //#define MENU_ITEM_EDIT_int3_P(str, pval, minval, maxval) MENU_ITEM_EDIT(int3, str, pval, minval, maxval)
 template <typename T>
 extern uint8_t menu_item_edit_P(const char* str, T pval, int16_t min_val, int16_t max_val);
-
-template <typename T>
-extern void menu_draw_P(char chr, const char* str, T val);
 
 extern void menu_progressbar_init(uint16_t total, const char* title);
 extern void menu_progressbar_update(uint16_t newVal);

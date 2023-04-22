@@ -10,7 +10,6 @@
 // Printer revision
 #define PRINTER_TYPE PRINTER_MK3S
 #define PRINTER_NAME PRINTER_MK3S_NAME
-#define PRINTER_NAME_ALTERNATE PRINTER_MK3_NAME //the other similar printer to this.
 #define PRINTER_MMU_TYPE PRINTER_MK3S_MMU2
 #define PRINTER_MMU_NAME PRINTER_MK3S_MMU2_NAME
 #define FILAMENT_SIZE "1_75mm_MK3S"
@@ -28,7 +27,7 @@
 #define HAS_SECOND_SERIAL_PORT
 
 // PSU
-// #define PSU_Delta                                 // uncomment if DeltaElectronics PSU installed
+#define PSU_Delta                                 // uncomment if DeltaElectronics PSU installed
 
 
 // Uncomment the below for the E3D PT100 temperature sensor (with or without PT100 Amplifier)
@@ -153,8 +152,7 @@
 
 // Filament sensor
 #define FILAMENT_SENSOR
-#define FILAMENT_SENSOR_TYPE FSENSOR_IR_ANALOG
-#define FSENSOR_PROBING
+#define IR_SENSOR
 
 // Backlash - 
 //#define BACKLASH_X
@@ -181,7 +179,7 @@
 //#define _NO_ASM
 #define DEBUG_DCODES //D codes
 #define DEBUG_STACK_MONITOR        //Stack monitor in stepper ISR
-//#define DEBUG_CRASHDET_COUNTERS  //Display crash-detection counters on LCD
+//#define DEBUG_FSENSOR_LOG          //Reports fsensor status to serial
 //#define DEBUG_RESUME_PRINT       //Resume/save print debug enable 
 //#define DEBUG_UVLO_AUTOMATIC_RECOVER // Power panic automatic recovery debug output 
 //#define DEBUG_DISABLE_XMINLIMIT  //x min limit ignored
@@ -205,6 +203,8 @@
 #define PLANNER_DIAGNOSTICS // Show the planner queue status on printer display.
 #define CMD_DIAGNOSTICS //Show cmd queue length on printer display
 #endif /* DEBUG_BUILD */
+
+//#define FSENSOR_QUALITY
 
 
 #define LINEARITY_CORRECTION
@@ -543,9 +543,6 @@
 #define PC_PREHEAT_HOTEND_TEMP 275
 #define PC_PREHEAT_HPB_TEMP 110
 
-#define PA_PREHEAT_HOTEND_TEMP 275
-#define PA_PREHEAT_HPB_TEMP 90
-
 #define ABS_PREHEAT_HOTEND_TEMP 255
 #define ABS_PREHEAT_HPB_TEMP 100
 
@@ -675,13 +672,11 @@
 
 //#define SUPPORT_VERBOSITY
 
-#define MMU_CONFIG_FILE "mmu2/variants/config_MMU2S.h"
-
 #define MMU_FILAMENT_COUNT 5
 
 #define MMU_REQUIRED_FW_BUILDNR 83
 #define MMU_HWRESET
-#define MMU_DEBUG //print communication between MMU and printer on serial
+#define MMU_DEBUG //print communication between MMU2 and printer on serial
 #define MMU_HAS_CUTTER
 
 // This is experimental feature requested by our test department.
@@ -692,11 +687,6 @@
 
 //#define MMU_ALWAYS_CUT
 #define MMU_IDLER_SENSOR_ATTEMPTS_NR 21 //max. number of attempts to load filament if first load failed; value for max bowden length and case when loading fails right at the beginning
-
-// MMU Error pause position
-#define MMU_ERR_X_PAUSE_POS 125
-#define MMU_ERR_Y_PAUSE_POS 0
-#define MMU_ERR_Z_PAUSE_LIFT 20
 
 // Default Arc Interpolation Settings (Now configurable via M214)
 #define DEFAULT_N_ARC_CORRECTION       25 // Number of interpolated segments between corrections.

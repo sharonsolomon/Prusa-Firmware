@@ -97,8 +97,8 @@ static_assert(sizeof(Sheets) == EEPROM_SHEETS_SIZEOF, "Sizeof(Sheets) is not EEP
 | ^           | ^       | ^                                     | fah 250      | ^                     | needs XYZ calibration                             | ^            | ^
 | ^           | ^       | ^                                     | 00h 0        | ^                     | Unknown (legacy)                                  | ^            | ^
 | 0x0FF5 4085 | uint16  | EEPROM_BABYSTEP_Z0                    | ???          | ff ffh 65535          | Babystep for Z ???                                | ???          | D3 Ax0ff5 C2
-| 0x0FF1 4081 | uint32  | EEPROM_FILAMENTUSED                   | ???          | 00 00 00 00h 0 __S/P__| Filament used in meters                           | ???          | D3 Ax0ff1 C4
-| 0x0FED 4077 | uint32  | EEPROM_TOTALTIME                      | ???          | 00 00 00 00h 0 __S/P__| Total print time in minutes                       | ???          | D3 Ax0fed C4
+| 0x0FF1 4081 | unint32 | EEPROM_FILAMENTUSED                   | ???          | 00 00 00 00h 0 __S/P__| Filament used in meters                           | ???          | D3 Ax0ff1 C4
+| 0x0FED 4077 | unint32 | EEPROM_TOTALTIME                      | ???          | 00 00 00 00h 0 __S/P__| Total print time                                  | ???          | D3 Ax0fed C4
 | 0x0FE5 4069 | float   | EEPROM_BED_CALIBRATION_CENTER         | ???          | ff ff ff ffh          | ???                                               | ???          | D3 Ax0fe5 C8
 | 0x0FDD 4061 | float   | EEPROM_BED_CALIBRATION_VEC_X          | ???          | ff ff ff ffh          | ???                                               | ???          | D3 Ax0fdd C8
 | 0x0FD5 4053 | float   | EEPROM_BED_CALIBRATION_VEC_Y          | ???          | ff ff ff ffh          | ???                                               | ???          | D3 Ax0fd5 C8
@@ -343,8 +343,8 @@ static_assert(sizeof(Sheets) == EEPROM_SHEETS_SIZEOF, "Sizeof(Sheets) is not EEP
 | 0x0CB2 3250 | float   | EEPROM_TEMP_MODEL_W                   | ???          | ff ff ff ffh          | Temp model warning threshold (K/s)                | Temp model   | D3 Ax0cb2 C4
 | 0x0CAE 3246 | float   | EEPROM_TEMP_MODEL_E                   | ???          | ff ff ff ffh          | Temp model error threshold (K/s)                  | Temp model   | D3 Ax0cae C4
 | 0x0CAD 3245 | uint8   | EEPROM_FSENSOR_JAM_DETECTION          | 01h 1        | ff/01                 | fsensor pat9125 jam detection feature             | LCD menu     | D3 Ax0cad C1
-| 0x0CAC 3244 | uint8   | EEPROM_MMU_ENABLED                    | 00h 0        | ff/00                 | MMU enabled                                       | LCD menu     | D3 Ax0cac C1
-| 0x0CA8 3240 | uint32  | EEPROM_MMU_MATERIAL_CHANGES           | ???          | ff ff ff ffh          | MMU toolchange counter over printers lifetime     | LCD statistic| D3 Ax0ca8 C4
+| 0x0CAC 3244 | uint8   | EEPROM_MMU_ENABLED                    | 01h 1        | ff/01                 | MMU enabled                                       | LCD menu     | D3 Ax0cac C1
+| 0x0CA8 3240 | uint32  | EEPROM_TOTAL_TOOLCHANGE_COUNT         | ???          | ff ff ff ffh          | MMU toolchange counter over printers lifetime     | LCD statistic| D3 Ax0ca8 C4
 | 0x0CA7 3239 | uint8   | EEPROM_HEAT_BED_ON_LOAD_FILAMENT      | ffh 255      | ffh 255               | Heat bed on load filament unknown state           | LCD menu     | D3 Ax0ca7 C1
 | ^           | ^       | ^                                     | 00h 0        | ^                     | Do not heat bed on load filament                  | ^            | ^
 | ^           | ^       | ^                                     | 01h 1        | ^                     | Heat bed on load filament                         | ^            | ^
@@ -520,11 +520,11 @@ static_assert(sizeof(Sheets) == EEPROM_SHEETS_SIZEOF, "Sizeof(Sheets) is not EEP
 
 // Sound Mode
 #define EEPROM_SOUND_MODE (EEPROM_UVLO_TARGET_HOTEND-1) // uint8
-#define EEPROM_SPOOL_JOIN (EEPROM_SOUND_MODE-1) //bool
+#define EEPROM_AUTO_DEPLETE (EEPROM_SOUND_MODE-1) //bool
 
-#define EEPROM_FSENS_RUNOUT_ENABLED (EEPROM_SPOOL_JOIN - 1) //bool
+#define EEPROM_FSENS_OQ_MEASS_ENABLED (EEPROM_AUTO_DEPLETE - 1) //bool
 
-#define EEPROM_MMU_FAIL_TOT (EEPROM_FSENS_RUNOUT_ENABLED - 2) //uint16_t
+#define EEPROM_MMU_FAIL_TOT (EEPROM_FSENS_OQ_MEASS_ENABLED - 2) //uint16_t
 #define EEPROM_MMU_FAIL (EEPROM_MMU_FAIL_TOT - 1) //uint8_t
 
 #define EEPROM_MMU_LOAD_FAIL_TOT (EEPROM_MMU_FAIL - 2) //uint16_t
@@ -586,8 +586,8 @@ static Sheets * const EEPROM_Sheets_base = (Sheets*)(EEPROM_SHEETS_BASE);
 
 #define EEPROM_FSENSOR_JAM_DETECTION (EEPROM_TEMP_MODEL_E-1) // uint8_t
 #define EEPROM_MMU_ENABLED (EEPROM_FSENSOR_JAM_DETECTION-1) // uint8_t
-#define EEPROM_MMU_MATERIAL_CHANGES (EEPROM_MMU_ENABLED-4) // uint32_t
-#define EEPROM_HEAT_BED_ON_LOAD_FILAMENT (EEPROM_MMU_MATERIAL_CHANGES-1) //uint8
+#define EEPROM_TOTAL_TOOLCHANGE_COUNT (EEPROM_MMU_ENABLED-4)
+#define EEPROM_HEAT_BED_ON_LOAD_FILAMENT (EEPROM_TOTAL_TOOLCHANGE_COUNT-1) //uint8
 #define EEPROM_CALIBRATION_STATUS_V2 (EEPROM_HEAT_BED_ON_LOAD_FILAMENT-1) //uint8
 
 #define EEPROM_TEMP_MODEL_U (EEPROM_CALIBRATION_STATUS_V2-4) //float
@@ -630,7 +630,6 @@ enum
 
 #ifdef __cplusplus
 void eeprom_init();
-void eeprom_adjust_bed_reset();
 struct SheetName
 {
     char c[sizeof(Sheet::name) + 1];

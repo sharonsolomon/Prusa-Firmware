@@ -1,4 +1,3 @@
-#include <stdarg.h>
 #include <util/atomic.h>
 #include "cmdqueue.h"
 #include "cardreader.h"
@@ -249,22 +248,6 @@ void cmdqueue_dump_to_serial()
 }
 #endif /* CMDBUFFER_DEBUG */
 
-static const char bufferFull[] PROGMEM = "\" failed: Buffer full!";
-static const char enqueingFront[] PROGMEM = "Enqueing to the front: \"";
-
-
-void enquecommandf_P(const char *fmt, ...)
-{
-    // MAX_CMD_SIZE is 96, but for formatting
-    // string we usually don't need more than 30 bytes
-    char cmd_buffer[30];
-    va_list ap;
-    va_start(ap, fmt);
-    vsnprintf_P(cmd_buffer, sizeof(cmd_buffer), fmt, ap);
-    va_end(ap);
-
-    enquecommand(cmd_buffer, false);
-}
 //adds an command to the main command buffer
 //thats really done in a non-safe way.
 //needs overworking someday
@@ -300,7 +283,7 @@ void enquecommand(const char *cmd, bool from_progmem)
             SERIAL_PROTOCOLRPGM(cmd);
         else
             SERIAL_ECHO(cmd);
-        SERIAL_ECHOLNRPGM(bufferFull);
+        SERIAL_ECHOLNPGM("\" failed: Buffer full!");
 #ifdef CMDBUFFER_DEBUG
         cmdqueue_dump_to_serial();
 #endif /* CMDBUFFER_DEBUG */
@@ -324,7 +307,7 @@ void enquecommand_front(const char *cmd, bool from_progmem)
             strcpy(cmdbuffer + bufindr + CMDHDRSIZE, cmd);
         ++ buflen;
         SERIAL_ECHO_START;
-        SERIAL_ECHORPGM(enqueingFront);
+        SERIAL_ECHOPGM("Enqueing to the front: \"");
         SERIAL_ECHO(cmdbuffer + bufindr + CMDHDRSIZE);
         SERIAL_ECHOLNPGM("\"");
 #ifdef CMDBUFFER_DEBUG
@@ -332,12 +315,12 @@ void enquecommand_front(const char *cmd, bool from_progmem)
 #endif /* CMDBUFFER_DEBUG */
     } else {
         SERIAL_ERROR_START;
-        SERIAL_ECHORPGM(enqueingFront);
+        SERIAL_ECHOPGM("Enqueing to the front: \"");
         if (from_progmem)
             SERIAL_PROTOCOLRPGM(cmd);
         else
             SERIAL_ECHO(cmd);
-        SERIAL_ECHOLNRPGM(bufferFull);
+        SERIAL_ECHOLNPGM("\" failed: Buffer full!");
 #ifdef CMDBUFFER_DEBUG
         cmdqueue_dump_to_serial();
 #endif /* CMDBUFFER_DEBUG */
@@ -391,7 +374,8 @@ void get_command()
 		  long gcode_N = -1; // seen line number
 
 		  // Line numbers must be first in buffer
-		  if (*cmd_head == 'N') {
+		  if ((strstr_P(cmdbuffer+bufindw+CMDHDRSIZE, PSTR("PRUSA")) == NULL) &&
+			  (*cmd_head == 'N')) {
 
 			  // Line number met: decode the number, then move cmd_start past all spaces.
 			  gcode_N = (strtol(cmd_head+1, &cmd_start, 10));
@@ -435,22 +419,19 @@ void get_command()
 				  serial_count = 0;
 				  return;
 			  }
-		}
-        else
-        {
-            // move cmd_start past all spaces
-            while (*cmd_start == ' ') ++cmd_start;
 
-            // if we didn't receive 'N' but still see '*'
-            if (strchr(cmd_start, '*') != NULL)
-            {
-                SERIAL_ERROR_START;
-                SERIAL_ERRORRPGM(_n("No Line Number with checksum, Last Line: "));////MSG_ERR_NO_LINENUMBER_WITH_CHECKSUM
-                SERIAL_ERRORLN(gcode_LastN);
-                FlushSerialRequestResend();
-                serial_count = 0;
-                return;
-            }
+			  // Don't parse N again with code_seen('N')
+			  *cmd_head = '$';
+		}
+        // if we don't receive 'N' but still see '*'
+        if ((*cmd_head != 'N') && (*cmd_head != '$') && (strchr(cmd_start, '*') != NULL))
+        {
+            SERIAL_ERROR_START;
+            SERIAL_ERRORRPGM(_n("No Line Number with checksum, Last Line: "));////MSG_ERR_NO_LINENUMBER_WITH_CHECKSUM
+            SERIAL_ERRORLN(gcode_LastN);
+			FlushSerialRequestResend();
+            serial_count = 0;
+            return;
         }
 
         // Handle KILL early, even when Stopped
@@ -486,21 +467,12 @@ void get_command()
 #ifdef CMDBUFFER_DEBUG
         SERIAL_ECHO_START;
         SERIAL_ECHOPGM("Storing a command line to buffer: ");
-        SERIAL_ECHO(cmd_start);
+        SERIAL_ECHO(cmdbuffer+bufindw+CMDHDRSIZE);
         SERIAL_ECHOLNPGM("");
 #endif /* CMDBUFFER_DEBUG */
 
-        // Store the command itself (without line number or checksum)
-        size_t cmd_len;
-        if (cmd_head == cmd_start)
-            cmd_len = strlen(cmd_start) + 1;
-        else {
-            // strip the line number
-            cmd_len = 0;
-            do { cmd_head[cmd_len] = cmd_start[cmd_len]; }
-            while (cmd_head[cmd_len++]);
-        }
-        bufindw += cmd_len + CMDHDRSIZE;
+        // Store command itself
+        bufindw += strlen(cmdbuffer+bufindw+CMDHDRSIZE) + (1 + CMDHDRSIZE);
         if (bufindw == sizeof(cmdbuffer))
             bufindw = 0;
         ++ buflen;
@@ -562,7 +534,7 @@ void get_command()
     char serial_char = (char)n;
     if( serial_char == '\n'
      || serial_char == '\r'
-     || serial_char == '#'
+     || ((serial_char == '#' || serial_char == ':') )
      || serial_count >= (MAX_CMD_SIZE - 1)
      || n==-1
     ){
@@ -574,7 +546,7 @@ void get_command()
         // This is either an empty line, or a line with just a comment.
         // Continue to the following line, and continue accumulating the number of bytes
         // read from the sdcard into sd_count, 
-        // so that the length of the already read empty lines and comments will be added
+        // so that the lenght of the already read empty lines and comments will be added
         // to the following non-empty line. 
         return; // prevent cycling indefinitely - let manage_heaters do their job
       }
@@ -638,12 +610,13 @@ void get_command()
           card.closefile();
 
           SERIAL_PROTOCOLLNRPGM(_n("Done printing file"));////MSG_FILE_PRINTED
+          stoptime=_millis();
           char time[30];
-          uint32_t t = (_millis() - starttime - pause_time) / 60000;
+          unsigned long t=(stoptime-starttime-pause_time)/1000;
           pause_time = 0;
           int hours, minutes;
-          minutes = t % 60;
-          hours = t / 60;
+          minutes=(t/60)%60;
+          hours=t/60/60;
           save_statistics(total_filament_used, t);
           sprintf_P(time, PSTR("%i hours %i minutes"),hours, minutes);
           SERIAL_ECHO_START;
@@ -653,7 +626,10 @@ void get_command()
           card.checkautostart(true);
 
           if (farm_mode)
-            prusa_statistics(6);
+          {
+              prusa_statistics(6);
+              lcd_commands_type = LcdCommands::FarmModeConfirm;
+          }
       }
   }
 

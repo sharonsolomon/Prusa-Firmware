@@ -15,7 +15,6 @@
 #include "fastio.h"
 //-//
 #include "sound.h"
-#include "backlight.h"
 
 #define LCD_DEFAULT_DELAY 100
 
@@ -66,8 +65,6 @@
 // bitmasks for flag argument settings
 #define LCD_RS_FLAG 0x01
 #define LCD_HALF_FLAG 0x02
-
-constexpr uint8_t row_offsets[] PROGMEM = { 0x00, 0x40, 0x14, 0x54 };
 
 FILE _lcdout; // = {0}; Global variable is always zero initialized, no need to explicitly state that.
 
@@ -332,30 +329,13 @@ void lcd_no_autoscroll(void)
 }
 #endif
 
-/// @brief set the current LCD row
-/// @param row LCD row number, ranges from 0 to LCD_HEIGHT - 1
-static void FORCE_INLINE lcd_set_current_row(uint8_t row)
-{
-	lcd_currline = min(row, LCD_HEIGHT - 1);
-}
-
-/// @brief Calculate the LCD row offset
-/// @param row LCD row number, ranges from 0 to LCD_HEIGHT - 1
-/// @return row offset which the LCD register understands
-static uint8_t __attribute__((noinline)) lcd_get_row_offset(uint8_t row)
-{
-	return pgm_read_byte(row_offsets + min(row, LCD_HEIGHT - 1));
-}
-
 void lcd_set_cursor(uint8_t col, uint8_t row)
 {
-	lcd_set_current_row(row);
-	lcd_command(LCD_SETDDRAMADDR | (col + lcd_get_row_offset(lcd_currline)));
-}
-
-void lcd_set_cursor_column(uint8_t col)
-{
-	lcd_command(LCD_SETDDRAMADDR | (col + lcd_get_row_offset(lcd_currline)));
+	uint8_t row_offsets[] = { 0x00, 0x40, 0x14, 0x54 };
+	if (row >= LCD_HEIGHT)
+		row = LCD_HEIGHT - 1;    // we count rows starting w/0
+	lcd_currline = row;  
+	lcd_command(LCD_SETDDRAMADDR | (col + row_offsets[row]));
 }
 
 // Allows us to fill the first 8 CGRAM locations
@@ -548,24 +528,13 @@ void lcd_print(const char* s)
 	while (*s) lcd_write(*(s++));
 }
 
-char lcd_print_pad(const char* s, uint8_t len)
+void lcd_print_pad(const char* s, uint8_t len)
 {
     while (len && *s) {
         lcd_write(*(s++));
         --len;
     }
     lcd_space(len);
-    return *s;
-}
-
-uint8_t lcd_print_pad_P(const char* s, uint8_t len)
-{
-    while (len && pgm_read_byte(s)) {
-        lcd_write(pgm_read_byte(s++));
-        --len;
-    }
-    lcd_space(len);
-    return len;
 }
 
 void lcd_print(char c, int base)
@@ -613,10 +582,16 @@ void lcd_print(unsigned long n, int base)
 		lcd_printNumber(n, base);
 }
 
+void lcd_print(double n, int digits)
+{
+  lcd_printFloat(n, digits);
+}
+
+
 void lcd_printNumber(unsigned long n, uint8_t base)
 {
 	unsigned char buf[8 * sizeof(long)]; // Assumes 8-bit chars. 
-	uint8_t i = 0;
+	unsigned long i = 0;
 	if (n == 0)
 	{
 		lcd_print('0');
@@ -631,13 +606,45 @@ void lcd_printNumber(unsigned long n, uint8_t base)
 		lcd_print((char) (buf[i - 1] < 10 ?	'0' + buf[i - 1] : 'A' + buf[i - 1] - 10));
 }
 
+void lcd_printFloat(double number, uint8_t digits) 
+{ 
+	// Handle negative numbers
+	if (number < 0.0)
+	{
+		lcd_print('-');
+		number = -number;
+	}
+	// Round correctly so that print(1.999, 2) prints as "2.00"
+	double rounding = 0.5;
+	for (uint8_t i=0; i<digits; ++i)
+		rounding /= 10.0;
+	number += rounding;
+	// Extract the integer part of the number and print it
+	unsigned long int_part = (unsigned long)number;
+	double remainder = number - (double)int_part;
+	lcd_print(int_part);
+	// Print the decimal point, but only if there are digits beyond
+	if (digits > 0)
+		lcd_print('.'); 
+	// Extract digits from the remainder one at a time
+	while (digits-- > 0)
+	{
+		remainder *= 10.0;
+		int toPrint = int(remainder);
+		lcd_print(toPrint);
+		remainder -= toPrint; 
+	} 
+}
+
+
 uint8_t lcd_draw_update = 2;
-int16_t lcd_encoder = 0;
-static int8_t lcd_encoder_diff = 0;
+int32_t lcd_encoder = 0;
+uint8_t lcd_encoder_bits = 0;
+int8_t lcd_encoder_diff = 0;
 
 uint8_t lcd_buttons = 0;
+uint8_t lcd_button_pressed = 0;
 uint8_t lcd_update_enabled = 1;
-static bool lcd_backlight_wake_trigger; // Flag set by interrupt when the knob is pressed or rotated
 
 uint32_t lcd_next_update_millis = 0;
 
@@ -687,6 +694,7 @@ Sound_MakeSound(e_SOUND_TYPE_ButtonEcho);
 void lcd_quick_feedback(void)
 {
   lcd_draw_update = 2;
+  lcd_button_pressed = false;
   lcd_beeper_quick_feedback();
 }
 
@@ -694,28 +702,8 @@ void lcd_update(uint8_t lcdDrawUpdateOverride)
 {
 	if (lcd_draw_update < lcdDrawUpdateOverride)
 		lcd_draw_update = lcdDrawUpdateOverride;
-
-	if (lcd_backlight_wake_trigger) {
-		lcd_backlight_wake_trigger = false;
-		backlight_wake();
-		if (abs(lcd_encoder_diff) >= ENCODER_PULSES_PER_STEP) {
-			lcd_encoder += lcd_encoder_diff / ENCODER_PULSES_PER_STEP;
-			lcd_encoder_diff = 0;
-			Sound_MakeSound(e_SOUND_TYPE_EncoderMove);
-		} else {
-			Sound_MakeSound(e_SOUND_TYPE_ButtonEcho);
-		}
-
-		if (lcd_draw_update == 0) {
-			// Update LCD rendering at minimum
-			lcd_draw_update = 1;
-		}
-	}
-
-	backlight_update();
-
-	if (!lcd_update_enabled) return;
-
+	if (!lcd_update_enabled)
+		return;
 	if (lcd_lcdupdate_func)
 		lcd_lcdupdate_func();
 }
@@ -752,11 +740,13 @@ bool lcd_longpress_trigger = 0;
 void lcd_buttons_update(void)
 {
     static uint8_t lcd_long_press_active = 0;
-    static uint8_t lcd_button_pressed = 0;
-    static uint8_t lcd_encoder_bits = 0;
+	uint8_t newbutton = 0;
+	if (READ(BTN_EN1) == 0)  newbutton |= EN_A;
+	if (READ(BTN_EN2) == 0)  newbutton |= EN_B;
+
     if (READ(BTN_ENC) == 0)
     { //button is pressed
-        if (buttonBlanking.expired_cont(BUTTON_BLANKING_TIME)) {
+        if (!buttonBlanking.running() || buttonBlanking.expired(BUTTON_BLANKING_TIME)) {
             buttonBlanking.start();
             safetyTimer.start();
             if ((lcd_button_pressed == 0) && (lcd_long_press_active == 0))
@@ -775,36 +765,53 @@ void lcd_buttons_update(void)
     { //button not pressed
         if (lcd_button_pressed)
         { //button was released
-            lcd_button_pressed = 0; // Reset to prevent double triggering
-            if (!lcd_long_press_active)
+            buttonBlanking.start();
+            if (lcd_long_press_active == 0)
             { //button released before long press gets activated
-                lcd_buttons |= EN_C; // This flag is reset when the event is consumed
+                newbutton |= EN_C;
             }
-            lcd_backlight_wake_trigger = true; // flag event, knob pressed
-            lcd_long_press_active = 0;
+            //else if (menu_menu == lcd_move_z) lcd_quick_feedback();
+            //lcd_button_pressed is set back to false via lcd_quick_feedback function
         }
+        lcd_long_press_active = 0;
     }
 
-    //manage encoder rotation
-    #define ENCODER_SPIN(_E1, _E2) switch (lcd_encoder_bits) { case _E1: lcd_encoder_diff++; break; case _E2: lcd_encoder_diff--; }
-    uint8_t enc = 0;
-    if (READ(BTN_EN1) == 0) enc |= B01;
-    if (READ(BTN_EN2) == 0) enc |= B10;
-    if (enc != lcd_encoder_bits)
-    {
-        switch (enc)
-        {
-            case encrot0: ENCODER_SPIN(encrot3, encrot1); break;
-            case encrot1: ENCODER_SPIN(encrot0, encrot2); break;
-            case encrot2: ENCODER_SPIN(encrot1, encrot3); break;
-            case encrot3: ENCODER_SPIN(encrot2, encrot0); break;
-        }
-
-        if (abs(lcd_encoder_diff) >= ENCODER_PULSES_PER_STEP) {
-            lcd_backlight_wake_trigger = true; // flag event, knob rotated
-        }
-        lcd_encoder_bits = enc;
-    }
+	lcd_buttons = newbutton;
+	//manage encoder rotation
+	uint8_t enc = 0;
+	if (lcd_buttons & EN_A) enc |= B01;
+	if (lcd_buttons & EN_B) enc |= B10;
+	if (enc != lcd_encoder_bits)
+	{
+		switch (enc)
+		{
+		case encrot0:
+			if (lcd_encoder_bits == encrot3)
+				lcd_encoder_diff++;
+			else if (lcd_encoder_bits == encrot1)
+				lcd_encoder_diff--;
+			break;
+		case encrot1:
+			if (lcd_encoder_bits == encrot0)
+				lcd_encoder_diff++;
+			else if (lcd_encoder_bits == encrot2)
+				lcd_encoder_diff--;
+			break;
+		case encrot2:
+			if (lcd_encoder_bits == encrot1)
+				lcd_encoder_diff++;
+			else if (lcd_encoder_bits == encrot3)
+				lcd_encoder_diff--;
+			break;
+		case encrot3:
+			if (lcd_encoder_bits == encrot2)
+				lcd_encoder_diff++;
+			else if (lcd_encoder_bits == encrot0)
+				lcd_encoder_diff--;
+			break;
+		}
+	}
+	lcd_encoder_bits = enc;
 }
 
 

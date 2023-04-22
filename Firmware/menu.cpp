@@ -45,7 +45,7 @@ void menu_data_reset(void)
 	memset(&menu_data, 0, sizeof(menu_data));
 }
 
-void menu_goto(menu_func_t menu, const int16_t encoder, bool reset_menu_state, const bool feedback)
+void menu_goto(menu_func_t menu, const uint32_t encoder, const bool feedback, bool reset_menu_state)
 {
 	CRITICAL_SECTION_START;
 	if (menu_menu != menu)
@@ -53,10 +53,11 @@ void menu_goto(menu_func_t menu, const int16_t encoder, bool reset_menu_state, c
 		menu_menu = menu;
 		lcd_encoder = encoder;
 		menu_top = 0; //reset menu view. Needed if menu_back() is called from deep inside a menu, such as Support
-		lcd_draw_update = 2; // Full LCD re-draw
 		CRITICAL_SECTION_END;
-		if (feedback) lcd_beeper_quick_feedback();
-		if (reset_menu_state) menu_data_reset();
+		if (reset_menu_state)
+			menu_data_reset();
+
+		if (feedback) lcd_quick_feedback();
 	}
 	else
 		CRITICAL_SECTION_END;
@@ -64,6 +65,7 @@ void menu_goto(menu_func_t menu, const int16_t encoder, bool reset_menu_state, c
 
 void menu_start(void)
 {
+    if (lcd_encoder > 0x8000) lcd_encoder = 0;
     if (lcd_encoder < 0)
     {
         lcd_encoder = 0;
@@ -72,7 +74,7 @@ void menu_start(void)
     if (lcd_encoder < menu_top)
 		menu_top = lcd_encoder;
     menu_line = menu_top;
-    menu_clicked = lcd_clicked(); // Consume click event
+    menu_clicked = LCD_CLICKED;
 }
 
 void menu_end(void)
@@ -94,7 +96,7 @@ void menu_end(void)
 void menu_back(uint8_t nLevel)
 {
      menu_depth = ((menu_depth > nLevel) ? (menu_depth - nLevel) : 0);
-     menu_goto(menu_stack[menu_depth].menu, menu_stack[menu_depth].position, true);
+     menu_goto(menu_stack[menu_depth].menu, menu_stack[menu_depth].position, true, true);
 }
 
 void menu_back(void)
@@ -107,7 +109,7 @@ void menu_back_no_reset(void)
 	if (menu_depth > 0)
 	{
 		menu_depth--;		
-		menu_goto(menu_stack[menu_depth].menu, menu_stack[menu_depth].position, false);
+		menu_goto(menu_stack[menu_depth].menu, menu_stack[menu_depth].position, true, false);
 	}
 }
 
@@ -117,31 +119,60 @@ void menu_back_if_clicked(void)
 		menu_back();
 }
 
-void menu_submenu(menu_func_t submenu, const bool feedback)
+void menu_back_if_clicked_fb(void)
 {
-	if (menu_depth < MENU_DEPTH_MAX)
+	if (lcd_clicked())
 	{
-		menu_stack[menu_depth].menu = menu_menu;
-		menu_stack[menu_depth++].position = lcd_encoder;
-		menu_goto(submenu, 0, true, feedback);
+        lcd_quick_feedback();
+		menu_back();
 	}
 }
 
-void menu_submenu_no_reset(menu_func_t submenu, const bool feedback)
+void menu_submenu(menu_func_t submenu)
 {
 	if (menu_depth < MENU_DEPTH_MAX)
 	{
 		menu_stack[menu_depth].menu = menu_menu;
 		menu_stack[menu_depth++].position = lcd_encoder;
-		menu_goto(submenu, 0, false, feedback);
+		menu_goto(submenu, 0, true, true);
+	}
+}
+
+void menu_submenu_no_reset(menu_func_t submenu)
+{
+	if (menu_depth < MENU_DEPTH_MAX)
+	{
+		menu_stack[menu_depth].menu = menu_menu;
+		menu_stack[menu_depth++].position = lcd_encoder;
+		menu_goto(submenu, 0, true, false);
 	}
 }
 
 uint8_t menu_item_ret(void)
 {
-	lcd_draw_update = 2;
+	lcd_quick_feedback();
 	return 1;
 }
+
+/*
+int menu_draw_item_printf_P(char type_char, const char* format, ...)
+{
+	va_list args;
+	va_start(args, format);
+	int ret = 0;
+    lcd_set_cursor(0, menu_row);
+	if (lcd_encoder == menu_item)
+		lcd_print('>');
+	else
+		lcd_print(' ');
+	int cnt = vfprintf_P(lcdout, format, args);
+	for (int i = cnt; i < 18; i++)
+		lcd_print(' ');
+	lcd_print(type_char);
+	va_end(args);
+	return ret;
+}
+*/
 
 static char menu_selection_mark(){
 	return (lcd_encoder == menu_item)?'>':' ';
@@ -150,9 +181,7 @@ static char menu_selection_mark(){
 static void menu_draw_item_puts_P(char type_char, const char* str)
 {
     lcd_set_cursor(0, menu_row);
-    lcd_putc(menu_selection_mark());
-    lcd_print_pad_P(str, LCD_WIDTH - 2);
-    lcd_putc(type_char);
+    lcd_printf_P(PSTR("%c%-18.18S%c"), menu_selection_mark(), str, type_char);
 }
 
 static void menu_draw_toggle_puts_P(const char* str, const char* toggle, const uint8_t settings)
@@ -161,21 +190,14 @@ static void menu_draw_toggle_puts_P(const char* str, const char* toggle, const u
     //xxxxxcba
     //a = selection mark. If it's set(1), then '>' will be used as the first character on the line. Else leave blank
     //b = toggle string is from progmem
-    uint8_t is_progmem = settings & 0x02;
-    const char eol = (toggle == NULL) ? LCD_STR_ARROW_RIGHT[0] : ' ';
+    //c = do not set cursor at all. Must be handled externally.
+    char lineStr[LCD_WIDTH + 1];
+    const char eol = (toggle == NULL)?LCD_STR_ARROW_RIGHT[0]:' ';
     if (toggle == NULL) toggle = _T(MSG_NA);
-    uint8_t len = 4 + (is_progmem ? strlen_P(toggle) : strlen(toggle));
-	lcd_putc_at(0, menu_row, (settings & 0x01) ? '>' : ' ');
-    lcd_print_pad_P(str, LCD_WIDTH - len);
-    lcd_putc('[');
-    if (is_progmem)
-    {
-        lcd_puts_P(toggle);
-    } else {
-        lcd_print(toggle);
-    }
-    lcd_putc(']');
-    lcd_putc(eol);
+    sprintf_P(lineStr, PSTR("%c%-18.18S"), (settings & 0x01)?'>':' ', str);
+    sprintf_P(lineStr + LCD_WIDTH - ((settings & 0x02)?strlen_P(toggle):strlen(toggle)) - 3, (settings & 0x02)?PSTR("[%S]%c"):PSTR("[%s]%c"), toggle, eol);
+    if (!(settings & 0x04)) lcd_set_cursor(0, menu_row);
+    fputs(lineStr, lcdout);
 }
 
 //! @brief Format sheet name
@@ -211,9 +233,7 @@ static void menu_draw_item_select_sheet_E(char type_char, const Sheet &sheet)
     lcd_set_cursor(0, menu_row);
     SheetFormatBuffer buffer;
     menu_format_sheet_select_E(sheet, buffer);
-    lcd_putc(menu_selection_mark());
-    lcd_print_pad(buffer.c, LCD_WIDTH - 2);
-    lcd_putc(type_char);
+    lcd_printf_P(PSTR("%c%-18.18s%c"), menu_selection_mark(), buffer.c, type_char);
 }
 
 
@@ -222,19 +242,25 @@ static void menu_draw_item_puts_E(char type_char, const Sheet &sheet)
     lcd_set_cursor(0, menu_row);
     SheetFormatBuffer buffer;
     menu_format_sheet_E(sheet, buffer);
-    lcd_putc(menu_selection_mark());
-    lcd_print_pad(buffer.c, LCD_WIDTH - 2);
-    lcd_putc(type_char);
+    lcd_printf_P(PSTR("%c%-18.18s%c"), menu_selection_mark(), buffer.c, type_char);
 }
 
 static void menu_draw_item_puts_P(char type_char, const char* str, char num)
 {
-    const uint8_t max_strlen = LCD_WIDTH - 3;
-    lcd_putc_at(0, menu_row, menu_selection_mark());
-    uint8_t len = lcd_print_pad_P(str, max_strlen);
-    lcd_putc_at((max_strlen - len) + 2, menu_row, num);
-    lcd_putc_at(LCD_WIDTH - 1, menu_row, type_char);
+    lcd_set_cursor(0, menu_row);
+    lcd_printf_P(PSTR("%c%-.16S "), menu_selection_mark(), str);
+    lcd_putc(num);
+    lcd_putc_at(19, menu_row, type_char);
 }
+
+/*
+int menu_draw_item_puts_P_int16(char type_char, const char* str, int16_t val, )
+{
+    lcd_set_cursor(0, menu_row);
+	int cnt = lcd_printf_P(PSTR("%c%-18S%c"), (lcd_encoder == menu_item)?'>':' ', str, type_char);
+	return cnt;
+}
+*/
 
 void menu_item_dummy(void)
 {
@@ -290,6 +316,8 @@ uint8_t __attribute__((noinline)) menu_item_function_E(const Sheet &sheet, menu_
         if (lcd_draw_update) menu_draw_item_select_sheet_E(' ', sheet);
         if (menu_clicked && (lcd_encoder == menu_item))
         {
+            menu_clicked = false;
+            lcd_consume_click();
             lcd_update_enabled = 0;
             if (func) func();
             lcd_update_enabled = 1;
@@ -326,6 +354,8 @@ uint8_t menu_item_function_P(const char* str, menu_func_t func)
 		if (lcd_draw_update) menu_draw_item_puts_P(' ', str);
 		if (menu_clicked && (lcd_encoder == menu_item))
 		{
+			menu_clicked = false;
+			lcd_consume_click();
 			lcd_update_enabled = 0;
 			if (func) func();
 			lcd_update_enabled = 1;
@@ -352,6 +382,8 @@ uint8_t menu_item_function_P(const char* str, char number, void (*func)(uint8_t)
         if (lcd_draw_update) menu_draw_item_puts_P(' ', str, number);
         if (menu_clicked && (lcd_encoder == menu_item))
         {
+            menu_clicked = false;
+            lcd_consume_click();
             lcd_update_enabled = 0;
             if (func) func(fn_par);
             lcd_update_enabled = 1;
@@ -376,6 +408,8 @@ uint8_t menu_item_toggle_P(const char* str, const char* toggle, menu_func_t func
 			}
 			else // do the actual toggling
 			{
+				menu_clicked = false;
+				lcd_consume_click();
 				lcd_update_enabled = 0;
 				if (func) func();
 				lcd_update_enabled = 1;
@@ -408,30 +442,35 @@ const char menu_fmt_float31[] PROGMEM = "%-12.12S%+8.1f";
 
 const char menu_fmt_float13[] PROGMEM = "%c%-13.13S%+5.3f";
 
+template<typename T>
+static void menu_draw_P(char chr, const char* str, int16_t val);
 
-
-template <typename T>
-void menu_draw_P(char chr, const char* str, T val)
+template<>
+void menu_draw_P<int16_t*>(char chr, const char* str, int16_t val)
 {
-	// The LCD row position is controlled externally. We may only modify the column here
-	lcd_putc(chr);
-	uint8_t len = lcd_print_pad_P(str, LCD_WIDTH - 1);
-	lcd_set_cursor_column((LCD_WIDTH - 1) - len + 1);
-	lcd_putc(':');
-
-	// The value is right adjusted, set the cursor then render the value
-	if (val < 10) { // 1 digit
-		lcd_set_cursor_column(LCD_WIDTH - 1);
-	} else if (val < 100) { // 2 digits
-		lcd_set_cursor_column(LCD_WIDTH - 2);
-	} else { // 3 digits
-		lcd_set_cursor_column(LCD_WIDTH - 3);
-	}
-	lcd_print(val);
+	int text_len = strlen_P(str);
+	if (text_len > 15) text_len = 15;
+	char spaces[LCD_WIDTH + 1] = {0};
+    memset(spaces,' ', LCD_WIDTH);
+	if (val <= -100) spaces[15 - text_len - 1] = 0;
+	else spaces[15 - text_len] = 0;
+	lcd_printf_P(menu_fmt_int3, chr, str, spaces, val);
 }
 
-template void menu_draw_P<int16_t>(char chr, const char* str, int16_t val);
-template void menu_draw_P<uint8_t>(char chr, const char* str, uint8_t val);
+template<>
+void menu_draw_P<uint8_t*>(char chr, const char* str, int16_t val)
+{
+    menu_data_edit_t* _md = (menu_data_edit_t*)&(menu_data[0]);
+    float factor = 1.0f + static_cast<float>(val) / 1000.0f;
+    if (val <= _md->minEditValue)
+    {
+        menu_draw_toggle_puts_P(str, _T(MSG_OFF), 0x04 | 0x02 | (chr=='>'));
+    }
+    else
+    {
+        lcd_printf_P(menu_fmt_float13, chr, str, factor);
+    }
+}
 
 //! @brief Draw up to 10 chars of text and a float number in format from +0.0 to +12345.0. The increased range is necessary
 //! for displaying large values of extruder positions, which caused text overflow in the previous implementation.
@@ -469,14 +508,14 @@ static void _menu_edit_P(void)
 	menu_data_edit_t* _md = (menu_data_edit_t*)&(menu_data[0]);
 	if (lcd_draw_update)
 	{
-		// Constrain the value in case it's outside the allowed limits
-		_md->currentValue = constrain(_md->currentValue, _md->minEditValue, _md->maxEditValue);
+		if (lcd_encoder < _md->minEditValue) lcd_encoder = _md->minEditValue;
+		else if (lcd_encoder > _md->maxEditValue) lcd_encoder = _md->maxEditValue;
 		lcd_set_cursor(0, 1);
-		menu_draw_P(' ', _md->editLabel, _md->currentValue);
+		menu_draw_P<T>(' ', _md->editLabel, (int)lcd_encoder);
 	}
-	if (lcd_clicked())
+	if (LCD_CLICKED)
 	{
-		*((T)(_md->editValue)) = _md->currentValue;
+		*((T)(_md->editValue)) = lcd_encoder;
 		menu_back_no_reset();
 	}
 }
@@ -490,7 +529,7 @@ uint8_t menu_item_edit_P(const char* str, T pval, int16_t min_val, int16_t max_v
 		if (lcd_draw_update) 
 		{
 			lcd_set_cursor(0, menu_row);
-			menu_draw_P(menu_selection_mark(), str, *pval);
+			menu_draw_P<T>(menu_selection_mark(), str, *pval);
 		}
 		if (menu_clicked && (lcd_encoder == menu_item))
 		{
@@ -519,8 +558,7 @@ void menu_progressbar_init(uint16_t total, const char* title)
 	progressbar_total = total;
 	
 	lcd_set_cursor(0, 1);
-	lcd_print_pad_P(title, LCD_WIDTH);
-	lcd_set_cursor(0, 2);
+	lcd_printf_P(PSTR("%-20.20S\n"), title);
 }
 
 void menu_progressbar_update(uint16_t newVal)

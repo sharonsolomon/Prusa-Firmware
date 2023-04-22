@@ -1,5 +1,6 @@
 // fan control and check
 #include "fancheck.h"
+#include "cardreader.h"
 #include "ultralcd.h"
 #include "sound.h"
 #include "messages.h"
@@ -84,7 +85,7 @@ void fanSpeedError(unsigned char _fan) {
     if (fan_check_error == EFCE_REPORTED) return;
     fan_check_error = EFCE_REPORTED;
 
-    if (printJobOngoing()) {
+    if (IS_SD_PRINTING || usb_timer.running()) {
         // A print is ongoing, pause the print normally
         if(!isPrintPaused) {
             if (usb_timer.running())
@@ -95,7 +96,7 @@ void fanSpeedError(unsigned char _fan) {
     }
     else {
         // Nothing is going on, but still turn off heaters and report the error
-        setTargetHotend(0);
+        setTargetHotend0(0);
         heating_status = HeatingStatus::NO_HEATING;
     }
     switch (_fan) {
@@ -163,9 +164,6 @@ bool extruder_altfan_detect()
 {
     // override isAltFan setting for detection
     altfanStatus.isAltfan = 0;
-
-    // During initialisation, use the EEPROM value
-    altfanStatus.altfanOverride = eeprom_init_default_byte((uint8_t*)EEPROM_ALTFAN_OVERRIDE, 0);
     setExtruderAutoFanState(3);
 
     SET_INPUT(TACH_0);

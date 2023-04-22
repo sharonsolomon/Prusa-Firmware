@@ -1,6 +1,5 @@
 # Mapping from LCD source encoding to unicode characters
 CUSTOM_CHARS = {
-    '\x06': '⏬',
     '\x04': '🔃',
     '\xdf': '°',
     '\xe1': 'ä',

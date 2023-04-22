@@ -4,19 +4,8 @@ import bisect
 import codecs
 import polib
 import regex
-import os
 import sys
 import lib.charset as cs
-from pathlib import Path
-
-# Absolute path
-BASE_DIR: Path = Path.absolute(Path(__file__).parent)
-PO_DIR: Path = BASE_DIR / "po"
-
-# Pathlib can't change the working directory yet
-# The script is currently made to assume the working
-# directory is ./lang/po
-os.chdir(PO_DIR)
 
 def line_warning(path, line, msg):
     print(f'{path}:{line}: {msg}', file=sys.stderr)
@@ -54,7 +43,7 @@ def index_to_line(index, lines):
 
 
 def extract_file(path, catalog, warn_skipped=False):
-    source = open(path, encoding="utf-8").read()
+    source = open(path).read()
     newlines = newline_positions(source)
 
     # match internationalized quoted strings
@@ -155,7 +144,7 @@ def extract_file(path, catalog, warn_skipped=False):
 
 
 def extract_refs(path, catalog):
-    source = open(path, encoding="utf-8").read()
+    source = open(path).read()
     newlines = newline_positions(source)
 
     # match message catalog references to add backrefs

@@ -12,7 +12,6 @@
 
 #define TMC2130_GCONF_NORMAL 0x00000000 // spreadCycle
 #define TMC2130_GCONF_SGSENS 0x00000180 // spreadCycle with stallguard (stall activates DIAG0 and DIAG1 [open collector])
-#define TMC2130_GCONF_DYNAMIC_SGSENS 0x00000184 // stealthChop/spreadCycle (dynamic) with stallguard (stall activates DIAG0 and DIAG1 [open collector])
 #define TMC2130_GCONF_SILENT 0x00000004 // stealthChop
 
 
@@ -46,9 +45,9 @@ uint8_t tmc2130_sg_homing_axes_mask = 0x00;
 
 const char eMotorCurrentScalingEnabled[] PROGMEM = "E-motor current scaling enabled";
 
-uint8_t tmc2130_sg_measure = 0xff;
-uint32_t tmc2130_sg_measure_cnt = 0;
-uint32_t tmc2130_sg_measure_val = 0;
+uint8_t tmc2130_sg_meassure = 0xff;
+uint32_t tmc2130_sg_meassure_cnt = 0;
+uint32_t tmc2130_sg_meassure_val = 0;
 
 uint8_t tmc2130_home_enabled = 0;
 uint8_t tmc2130_home_origin[2] = {0, 0};
@@ -183,9 +182,9 @@ void tmc2130_init(TMCInitParams params)
 #else //TMC2130_STEALTH_Z
 		tmc2130_wr(axis, TMC2130_REG_COOLCONF, (((uint32_t)tmc2130_sg_thr[axis]) << 16) | ((uint32_t)1 << 24));
 		tmc2130_wr(axis, TMC2130_REG_TCOOLTHRS, (tmc2130_mode == TMC2130_MODE_SILENT)?0:__tcoolthrs(axis));
-		tmc2130_wr(axis, TMC2130_REG_GCONF, (tmc2130_mode == TMC2130_MODE_SILENT)?TMC2130_GCONF_SILENT:TMC2130_GCONF_DYNAMIC_SGSENS);
+		tmc2130_wr(axis, TMC2130_REG_GCONF, (tmc2130_mode == TMC2130_MODE_SILENT)?TMC2130_GCONF_SILENT:TMC2130_GCONF_SGSENS);
 		tmc2130_wr_PWMCONF(axis, tmc2130_pwm_ampl[axis], tmc2130_pwm_grad[axis], tmc2130_pwm_freq[axis], tmc2130_pwm_auto[axis], 0, 0);
-		tmc2130_wr_TPWMTHRS(axis, (tmc2130_mode == TMC2130_MODE_SILENT)?0:0xFFFF0);
+		tmc2130_wr_TPWMTHRS(axis, TMC2130_TPWMTHRS);
 #endif //TMC2130_STEALTH_Z
 	}
 	for (uint_least8_t axis = 3; axis < 4; axis++) // E axis
@@ -253,12 +252,12 @@ void tmc2130_st_isr()
 
 bool tmc2130_update_sg()
 {
-	if (tmc2130_sg_measure <= E_AXIS)
+	if (tmc2130_sg_meassure <= E_AXIS)
 	{
 		uint32_t val32 = 0;
-		tmc2130_rd(tmc2130_sg_measure, TMC2130_REG_DRV_STATUS, &val32);
-		tmc2130_sg_measure_val += (val32 & 0x3ff);
-		tmc2130_sg_measure_cnt++;
+		tmc2130_rd(tmc2130_sg_meassure, TMC2130_REG_DRV_STATUS, &val32);
+		tmc2130_sg_meassure_val += (val32 & 0x3ff);
+		tmc2130_sg_meassure_cnt++;
 		return true;
 	}
 	return false;
@@ -327,17 +326,17 @@ void tmc2130_home_exit()
 #endif
 }
 
-void tmc2130_sg_measure_start(uint8_t axis)
+void tmc2130_sg_meassure_start(uint8_t axis)
 {
-	tmc2130_sg_measure = axis;
-	tmc2130_sg_measure_cnt = 0;
-	tmc2130_sg_measure_val = 0;
+	tmc2130_sg_meassure = axis;
+	tmc2130_sg_meassure_cnt = 0;
+	tmc2130_sg_meassure_val = 0;
 }
 
-uint16_t tmc2130_sg_measure_stop()
+uint16_t tmc2130_sg_meassure_stop()
 {
-	tmc2130_sg_measure = 0xff;
-	return tmc2130_sg_measure_val / tmc2130_sg_measure_cnt;
+	tmc2130_sg_meassure = 0xff;
+	return tmc2130_sg_meassure_val / tmc2130_sg_meassure_cnt;
 }
 
 

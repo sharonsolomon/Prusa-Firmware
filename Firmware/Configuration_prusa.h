@@ -41,7 +41,8 @@
   *------------------------------------*/
 
  // Steps per unit {X,Y,Z,E}
- #define DEFAULT_AXIS_STEPS_PER_UNIT   {100,100,3200/8,133}
+ //FLAG this is hobbed gear
+ #define DEFAULT_AXIS_STEPS_PER_UNIT   {100,100,3200/8,161.3}
 
  // Endstop inverting
  #define X_MIN_ENDSTOP_INVERTING 0 // set to 1 to invert the logic of the endstop.
@@ -65,6 +66,7 @@
  #define X_MAX_POS 250
  #define X_MIN_POS 0
  #define Y_MAX_POS 210
+ //FLAG
  #define Y_MIN_POS -4
  #define Z_MAX_POS 210
  #define Z_MIN_POS 0.15
@@ -72,6 +74,7 @@
  // Canceled home position
  #define X_CANCEL_POS 50
  #define Y_CANCEL_POS 190
+ #define Z_CANCEL_LIFT 50
 
  //Pause print position
  #define X_PAUSE_POS 50
@@ -107,6 +110,7 @@
  #define Z_AXIS_ALWAYS_ON 1
 
  // New XYZ calibration
+ //FLAG
  #define NEW_XYZCAL
 
  // Watchdog support
@@ -124,7 +128,7 @@
  #define FILAMENT_SENSOR
  //#define IR_SENSOR
 
-
+ #define DEBUG_DCODE2
  #define DEBUG_DCODE3
 
  //#define DEBUG_BUILD
@@ -178,7 +182,7 @@
  #error "Check maximal allowed value @ ShortTimer (see BED_MINTEMP_DELAY definition)"
  #endif
  //#define SUPERPINDA_SUPPORT
- #define PINDA_MINTEMP 35 //The miniRAMBo thermistor readings below 30°C aren't very accurate
+ #define PINDA_MINTEMP 30 //The miniRAMBo thermistor readings below 30°C aren't very accurate
  #define PINDA_TEMP_COMP  //Used to enable SuperPINDA toggle menu/function
 
  // Maxtemps
@@ -198,6 +202,7 @@
  #define  DEFAULT_Kd 73.76
  #else
  // Define PID constants for extruder
+ //FLAG
  //#define  DEFAULT_Kp 40.925
  //#define  DEFAULT_Ki 4.875
  //#define  DEFAULT_Kd 86.085
@@ -216,6 +221,8 @@
  #define EXTRUDER_AUTO_FAN_TEMPERATURE 50
  #define EXTRUDER_AUTO_FAN_SPEED   255  // == full speed
 
+ #define FANCHECK_AUTO_PRINT_FAN_THRS 70 //[RPS] - Used during selftest to identify swapped fans automatically
+ #define FANCHECK_AUTO_FAIL_THRS 20 //[RPS] - Used during selftest to identify a faulty fan
 
  /*------------------------------------
   LOAD/UNLOAD FILAMENT SETTINGS
@@ -302,6 +309,7 @@
 
  #define MBL_Z_STEP 0.01
 
+//FLAG
  // Mesh definitions
  #define MESH_MIN_X 24
  #define MESH_MAX_X 228

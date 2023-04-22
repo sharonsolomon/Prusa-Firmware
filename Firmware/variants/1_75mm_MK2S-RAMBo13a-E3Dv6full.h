@@ -41,6 +41,7 @@
   *------------------------------------*/
 
  // Steps per unit {X,Y,Z,E}
+ //FLAG this is hobbed gear
  #define DEFAULT_AXIS_STEPS_PER_UNIT   {100,100,3200/8,161.3}
 
  // Endstop inverting
@@ -73,6 +74,7 @@
  // Canceled home position
  #define X_CANCEL_POS 50
  #define Y_CANCEL_POS 190
+ #define Z_CANCEL_LIFT 50
 
  //Pause print position
  #define X_PAUSE_POS 50

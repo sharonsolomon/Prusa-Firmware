@@ -125,7 +125,6 @@ enum class LcdCommands : uint_least8_t
 };
 
 extern LcdCommands lcd_commands_type;
-extern int8_t FSensorStateMenu;
 
 enum class CustomMsg : uint_least8_t
 {
@@ -160,18 +159,15 @@ extern bool FarmOrUserECool();
 
 #if defined(FILAMENT_SENSOR) && (FILAMENT_SENSOR_TYPE == FSENSOR_IR_ANALOG)
 void printf_IRSensorAnalogBoardChange();
-#endif //IR_SENSOR_ANALOG
+#endif //defined(FILAMENT_SENSOR) && (FILAMENT_SENSOR_TYPE == FSENSOR_IR_ANALOG)
 
 extern int8_t SilentModeMenu;
-extern uint8_t SilentModeMenu_MMU;
 
-extern bool cancel_heatup;
 extern bool isPrintPaused;
 
 extern uint8_t scrollstuff;
 
 
-void lcd_ignore_click(bool b=true);
 void lcd_commands();
 
 

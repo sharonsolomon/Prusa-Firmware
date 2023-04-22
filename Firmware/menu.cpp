@@ -77,6 +77,11 @@ void menu_start(void)
 
 void menu_end(void)
 {
+	if (menu_row >= LCD_HEIGHT)
+	{
+		// Early abort if the menu was clicked. The current menu might have changed because of the click event
+		return;
+	}
 	if (lcd_encoder >= menu_item)
 	{
 		lcd_encoder = menu_item - 1;
@@ -137,10 +142,15 @@ void menu_submenu_no_reset(menu_func_t submenu, const bool feedback)
 	}
 }
 
-uint8_t menu_item_ret(void)
+void menu_item_ret(void)
 {
 	lcd_draw_update = 2;
-	return 1;
+	menu_item++;
+	
+	//prevent the rest of the menu items from rendering or getting clicked
+	menu_row = LCD_HEIGHT; // early exit from the MENU_BEGIN() for loop at the end of the current cycle
+	menu_line = 0; // prevent subsequent menu items from rendering at all in the current MENU_BEGIN() for loop cycle
+	menu_clicked = 0; // prevent subsequent items from being able to be clicked in case the current menu or position was changed by the clicked menu item
 }
 
 static char menu_selection_mark(){
@@ -149,8 +159,7 @@ static char menu_selection_mark(){
 
 static void menu_draw_item_puts_P(char type_char, const char* str)
 {
-    lcd_set_cursor(0, menu_row);
-    lcd_putc(menu_selection_mark());
+    lcd_putc_at(0, menu_row, menu_selection_mark());
     lcd_print_pad_P(str, LCD_WIDTH - 2);
     lcd_putc(type_char);
 }
@@ -208,10 +217,9 @@ void menu_format_sheet_select_E(const Sheet &sheet_E, SheetFormatBuffer &buffer)
 
 static void menu_draw_item_select_sheet_E(char type_char, const Sheet &sheet)
 {
-    lcd_set_cursor(0, menu_row);
     SheetFormatBuffer buffer;
     menu_format_sheet_select_E(sheet, buffer);
-    lcd_putc(menu_selection_mark());
+    lcd_putc_at(0, menu_row, menu_selection_mark());
     lcd_print_pad(buffer.c, LCD_WIDTH - 2);
     lcd_putc(type_char);
 }
@@ -219,10 +227,9 @@ static void menu_draw_item_select_sheet_E(char type_char, const Sheet &sheet)
 
 static void menu_draw_item_puts_E(char type_char, const Sheet &sheet)
 {
-    lcd_set_cursor(0, menu_row);
     SheetFormatBuffer buffer;
     menu_format_sheet_E(sheet, buffer);
-    lcd_putc(menu_selection_mark());
+    lcd_putc_at(0, menu_row, menu_selection_mark());
     lcd_print_pad(buffer.c, LCD_WIDTH - 2);
     lcd_putc(type_char);
 }
@@ -247,13 +254,16 @@ uint8_t menu_item_text_P(const char* str)
 	{
 		if (lcd_draw_update) menu_draw_item_puts_P(' ', str);
 		if (menu_clicked && (lcd_encoder == menu_item))
-			return menu_item_ret();
+		{
+			menu_item_ret();
+			return 1;
+		}
 	}
 	menu_item++;
 	return 0;
 }
 
-uint8_t menu_item_submenu_P(const char* str, menu_func_t submenu)
+void menu_item_submenu_P(const char* str, menu_func_t submenu)
 {
 	if (menu_item == menu_line)
 	{
@@ -261,14 +271,14 @@ uint8_t menu_item_submenu_P(const char* str, menu_func_t submenu)
 		if (menu_clicked && (lcd_encoder == menu_item))
 		{
 			menu_submenu(submenu);
-			return menu_item_ret();
+			menu_item_ret();
+			return;
 		}
 	}
 	menu_item++;
-	return 0;
 }
 
-uint8_t menu_item_submenu_E(const Sheet &sheet, menu_func_t submenu)
+void menu_item_submenu_E(const Sheet &sheet, menu_func_t submenu)
 {
     if (menu_item == menu_line)
     {
@@ -276,14 +286,14 @@ uint8_t menu_item_submenu_E(const Sheet &sheet, menu_func_t submenu)
         if (menu_clicked && (lcd_encoder == menu_item))
         {
             menu_submenu(submenu);
-            return menu_item_ret();
+            menu_item_ret();
+            return;
         }
     }
     menu_item++;
-    return 0;
 }
 
-uint8_t __attribute__((noinline)) menu_item_function_E(const Sheet &sheet, menu_func_t func)
+void __attribute__((noinline)) menu_item_function_E(const Sheet &sheet, menu_func_t func)
 {
     if (menu_item == menu_line)
     {
@@ -293,14 +303,14 @@ uint8_t __attribute__((noinline)) menu_item_function_E(const Sheet &sheet, menu_
             lcd_update_enabled = 0;
             if (func) func();
             lcd_update_enabled = 1;
-            return menu_item_ret();
+            menu_item_ret();
+            return;
         }
     }
     menu_item++;
-    return 0;
 }
 
-uint8_t menu_item_back_P(const char* str)
+void menu_item_back_P(const char* str)
 {
 	if (menu_item == menu_line)
 	{
@@ -308,18 +318,18 @@ uint8_t menu_item_back_P(const char* str)
 		if (menu_clicked && (lcd_encoder == menu_item))
 		{
 			menu_back();
-			return menu_item_ret();
+			menu_item_ret();
+			return;
 		}
 	}
 	menu_item++;
-	return 0;
 }
 
 bool __attribute__((noinline)) menu_item_leave(){
     return ((menu_item == menu_line) && menu_clicked && (lcd_encoder == menu_item)) || menu_leaving;
 }
 
-uint8_t menu_item_function_P(const char* str, menu_func_t func)
+void menu_item_function_P(const char* str, menu_func_t func)
 {
 	if (menu_item == menu_line)
 	{
@@ -329,11 +339,11 @@ uint8_t menu_item_function_P(const char* str, menu_func_t func)
 			lcd_update_enabled = 0;
 			if (func) func();
 			lcd_update_enabled = 1;
-			return menu_item_ret();
+			menu_item_ret();
+			return;
 		}
 	}
 	menu_item++;
-	return 0;
 }
 
 //! @brief Menu item function taking single parameter
@@ -345,7 +355,7 @@ uint8_t menu_item_function_P(const char* str, menu_func_t func)
 //! @param fn_par value to be passed to function
 //! @retval 0
 //! @retval 1 Item was clicked
-uint8_t menu_item_function_P(const char* str, char number, void (*func)(uint8_t), uint8_t fn_par)
+void menu_item_function_P(const char* str, char number, void (*func)(uint8_t), uint8_t fn_par)
 {
     if (menu_item == menu_line)
     {
@@ -355,14 +365,14 @@ uint8_t menu_item_function_P(const char* str, char number, void (*func)(uint8_t)
             lcd_update_enabled = 0;
             if (func) func(fn_par);
             lcd_update_enabled = 1;
-            return menu_item_ret();
+            menu_item_ret();
+            return;
         }
     }
     menu_item++;
-    return 0;
 }
 
-uint8_t menu_item_toggle_P(const char* str, const char* toggle, menu_func_t func, const uint8_t settings)
+void menu_item_toggle_P(const char* str, const char* toggle, menu_func_t func, const uint8_t settings)
 {
 	if (menu_item == menu_line)
 	{
@@ -372,22 +382,21 @@ uint8_t menu_item_toggle_P(const char* str, const char* toggle, menu_func_t func
 			if (toggle == NULL) // print N/A warning message
 			{
 				menu_submenu(func);
-				return menu_item_ret();
 			}
 			else // do the actual toggling
 			{
 				lcd_update_enabled = 0;
 				if (func) func();
 				lcd_update_enabled = 1;
-				return menu_item_ret();
 			}
+			menu_item_ret();
+			return;
 		}
 	}
 	menu_item++;
-	return 0;
 }
 
-uint8_t menu_item_gcode_P(const char* str, const char* str_gcode)
+void menu_item_gcode_P(const char* str, const char* str_gcode)
 {
 	if (menu_item == menu_line)
 	{
@@ -395,11 +404,11 @@ uint8_t menu_item_gcode_P(const char* str, const char* str_gcode)
 		if (menu_clicked && (lcd_encoder == menu_item))
 		{
 			if (str_gcode) enquecommand_P(str_gcode);
-			return menu_item_ret();
+			menu_item_ret();
+			return;
 		}
 	}
 	menu_item++;
-	return 0;
 }
 
 const char menu_fmt_int3[] PROGMEM = "%c%.15S:%s%3d";
@@ -427,7 +436,7 @@ void menu_draw_P(char chr, const char* str, T val)
 	} else { // 3 digits
 		lcd_set_cursor_column(LCD_WIDTH - 3);
 	}
-	lcd_print(val);
+	lcd_print(val, DEC);
 }
 
 template void menu_draw_P<int16_t>(char chr, const char* str, int16_t val);
@@ -469,6 +478,9 @@ static void _menu_edit_P(void)
 	menu_data_edit_t* _md = (menu_data_edit_t*)&(menu_data[0]);
 	if (lcd_draw_update)
 	{
+		_md->currentValue += lcd_encoder;
+		lcd_encoder = 0; // Consume knob rotation event
+
 		// Constrain the value in case it's outside the allowed limits
 		_md->currentValue = constrain(_md->currentValue, _md->minEditValue, _md->maxEditValue);
 		lcd_set_cursor(0, 1);
@@ -482,7 +494,7 @@ static void _menu_edit_P(void)
 }
 
 template <typename T>
-uint8_t menu_item_edit_P(const char* str, T pval, int16_t min_val, int16_t max_val)
+void menu_item_edit_P(const char* str, T pval, int16_t min_val, int16_t max_val)
 {
 	menu_data_edit_t* _md = (menu_data_edit_t*)&(menu_data[0]);
 	if (menu_item == menu_line)
@@ -497,18 +509,18 @@ uint8_t menu_item_edit_P(const char* str, T pval, int16_t min_val, int16_t max_v
 			menu_submenu_no_reset(_menu_edit_P<T>);
 			_md->editLabel = str;
 			_md->editValue = pval;
+			_md->currentValue = *pval;
 			_md->minEditValue = min_val;
 			_md->maxEditValue = max_val;
-			lcd_encoder = *pval;
-			return menu_item_ret();
+			menu_item_ret();
+			return;
 		}
 	}
 	menu_item++;
-	return 0;
 }
 
-template uint8_t menu_item_edit_P<int16_t*>(const char* str, int16_t *pval, int16_t min_val, int16_t max_val);
-template uint8_t menu_item_edit_P<uint8_t*>(const char* str, uint8_t *pval, int16_t min_val, int16_t max_val);
+template void menu_item_edit_P<int16_t*>(const char* str, int16_t *pval, int16_t min_val, int16_t max_val);
+template void menu_item_edit_P<uint8_t*>(const char* str, uint8_t *pval, int16_t min_val, int16_t max_val);
 
 static uint8_t progressbar_block_count = 0;
 static uint16_t progressbar_total = 0;

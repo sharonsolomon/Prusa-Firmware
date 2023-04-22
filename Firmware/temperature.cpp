@@ -598,7 +598,7 @@ static float analog2temp(int raw, uint8_t e) {
       SERIAL_ERROR_START;
       SERIAL_ERROR((int)e);
       SERIAL_ERRORLNPGM(" - Invalid extruder number !");
-      kill(NULL, 6);
+      kill();
       return 0.0;
   } 
   #ifdef HEATER_0_USES_MAX6675
@@ -944,17 +944,6 @@ static void temp_runaway_check(uint8_t _heater_id, float _target_temperature, fl
 			__preheat_counter[_heater_id]++;
 			if (__preheat_counter[_heater_id] > ((_isbed) ? 16 : 8)) // periodicaly check if current temperature changes
 			{
-				/*SERIAL_ECHOPGM("Heater:");
-				MYSERIAL.print(_heater_id);
-				SERIAL_ECHOPGM(" T:");
-				MYSERIAL.print(_current_temperature);
-				SERIAL_ECHOPGM(" Tstart:");
-				MYSERIAL.print(__preheat_start[_heater_id]);
-				SERIAL_ECHOPGM(" delta:");
-				MYSERIAL.print(_current_temperature-__preheat_start[_heater_id]);*/
-				
-//-//				if (_current_temperature - __preheat_start[_heater_id] < 2) {
-//-//				if (_current_temperature - __preheat_start[_heater_id] < ((_isbed && (_current_temperature>105.0))?0.6:2.0)) {
                     __delta=2.0;
                     if(_isbed)
                          {
@@ -964,11 +953,7 @@ static void temp_runaway_check(uint8_t _heater_id, float _target_temperature, fl
                          }
 				if (_current_temperature - __preheat_start[_heater_id] < __delta) {
 					__preheat_errors[_heater_id]++;
-					/*SERIAL_ECHOPGM(" Preheat errors:");
-					MYSERIAL.println(__preheat_errors[_heater_id]);*/
-				}
-				else {
-					//SERIAL_ECHOLNPGM("");
+				} else {
 					__preheat_errors[_heater_id] = 0;
 				}
 
@@ -980,12 +965,8 @@ static void temp_runaway_check(uint8_t _heater_id, float _target_temperature, fl
 			}
 		}
 
-//-//		if (_current_temperature >= _target_temperature  && temp_runaway_status[_heater_id] == TempRunaway_PREHEAT)
 		if ((_current_temperature > (_target_temperature - __hysteresis))  && temp_runaway_status[_heater_id] == TempRunaway_PREHEAT)
 		{
-			/*SERIAL_ECHOPGM("Heater:");
-			MYSERIAL.print(_heater_id);
-			MYSERIAL.println(" ->tempRunaway");*/
 			temp_runaway_status[_heater_id] = TempRunaway_ACTIVE;
 			temp_runaway_check_active = false;
 			temp_runaway_error_counter[_heater_id] = 0;
@@ -2093,9 +2074,9 @@ void adc_callback()
 #ifdef VOLT_BED_PIN
     current_voltage_raw_bed = adc_values[ADC_PIN_IDX(VOLT_BED_PIN)]; // 6->9
 #endif
-#ifdef IR_SENSOR_ANALOG
-    current_voltage_raw_IR = adc_values[ADC_PIN_IDX(VOLT_IR_PIN)];
-#endif //IR_SENSOR_ANALOG
+#if defined(FILAMENT_SENSOR) && (FILAMENT_SENSOR_TYPE == FSENSOR_IR_ANALOG)
+    fsensor.voltUpdate(adc_values[ADC_PIN_IDX(VOLT_IR_PIN)]);
+#endif //defined(FILAMENT_SENSOR) && (FILAMENT_SENSOR_TYPE == FSENSOR_IR_ANALOG)
     adc_values_ready = true;
 }
 
@@ -2261,7 +2242,7 @@ static void check_min_temp_raw()
         if(target_temperature_isr[active_extruder]>minttemp[active_extruder]) {
             // ~ nozzle heating is on
             bCheckingOnHeater=bCheckingOnHeater||(current_temperature_isr[active_extruder]>(minttemp[active_extruder]+TEMP_HYSTERESIS)); // for eventually delay cutting
-            if(oTimer4minTempHeater.expired(HEATER_MINTEMP_DELAY)||(!oTimer4minTempHeater.running())||bCheckingOnHeater) {
+            if(oTimer4minTempHeater.expired_cont(HEATER_MINTEMP_DELAY) || bCheckingOnHeater) {
                 bCheckingOnHeater=true;   // not necessary
                 check_min_temp_heater0(); // delay is elapsed or temperature is/was over minTemp => periodical checking is active
             }
@@ -2275,7 +2256,7 @@ static void check_min_temp_raw()
         if(target_temperature_bed_isr>BED_MINTEMP) {
             // ~ bed heating is on
             bCheckingOnBed=bCheckingOnBed||(current_temperature_bed_isr>(BED_MINTEMP+TEMP_HYSTERESIS)); // for eventually delay cutting
-            if(oTimer4minTempBed.expired(BED_MINTEMP_DELAY)||(!oTimer4minTempBed.running())||bCheckingOnBed) {
+            if(oTimer4minTempBed.expired_cont(BED_MINTEMP_DELAY) || bCheckingOnBed) {
                 bCheckingOnBed=true;  // not necessary
                 check_min_temp_bed(); // delay is elapsed or temperature is/was over minTemp => periodical checking is active
             }

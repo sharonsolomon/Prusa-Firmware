@@ -43,7 +43,6 @@
  *
  */
 
-//-//
 #include "Configuration.h"
 #include "Marlin.h"
 #include "config.h"
@@ -183,13 +182,10 @@ bool mesh_bed_leveling_flag = false;
 
 uint32_t total_filament_used;
 HeatingStatus heating_status;
-uint8_t heating_status_counter;
 bool loading_flag = false;
 
 #define XY_NO_RESTORE_FLAG (mesh_bed_leveling_flag || homing_flag)
 
-
-bool fan_state[2];
 int fan_edge_counter[2];
 int fan_speed[2];
 
@@ -245,11 +241,11 @@ uint8_t newFanSpeed = 0;
 	  bool powersupply = true;
   #endif
 
-bool cancel_heatup = false;
+static bool cancel_heatup = false;
 
 int8_t busy_state = NOT_BUSY;
 static long prev_busy_signal_ms = -1;
-uint8_t host_keepalive_interval = HOST_KEEPALIVE_INTERVAL;
+static uint8_t host_keepalive_interval = HOST_KEEPALIVE_INTERVAL;
 
 const char errormagic[] PROGMEM = "Error:";
 const char echomagic[] PROGMEM = "echo:";
@@ -259,9 +255,9 @@ const char echomagic[] PROGMEM = "echo:";
 #define X_COORD_INVALID (X_MIN_POS-1)
 
 #define SAVED_START_POSITION_UNSET X_COORD_INVALID
-float saved_start_position[NUM_AXIS] = {SAVED_START_POSITION_UNSET, 0, 0, 0};
+static float saved_start_position[NUM_AXIS] = {SAVED_START_POSITION_UNSET, 0, 0, 0};
 
-uint16_t saved_segment_idx = 0;
+static uint16_t saved_segment_idx = 0;
 
 // storing estimated time to end of print counted by slicer
 uint8_t print_percent_done_normal = PRINT_PERCENT_DONE_INIT;
@@ -293,16 +289,16 @@ static float next_feedrate;
 // Original feedrate saved during homing moves
 static float saved_feedrate;
 
-const int8_t sensitive_pins[] PROGMEM = SENSITIVE_PINS; // Sensitive pin list for M42
+static const int8_t sensitive_pins[] PROGMEM = SENSITIVE_PINS; // Sensitive pin list for M42
 
 //static float tt = 0;
 //static float bt = 0;
 
 //Inactivity shutdown variables
 static LongTimer previous_millis_cmd;
-unsigned long max_inactive_time = 0;
-static unsigned long stepper_inactive_time = DEFAULT_STEPPER_DEACTIVE_TIME*1000l;
-static unsigned long safetytimer_inactive_time = DEFAULT_SAFETYTIMER_TIME_MINS*60*1000ul;
+static uint32_t max_inactive_time = 0;
+static uint32_t stepper_inactive_time = DEFAULT_STEPPER_DEACTIVE_TIME*1000l;
+static uint32_t safetytimer_inactive_time = DEFAULT_SAFETYTIMER_TIME_MINS*60*1000ul;
 
 uint32_t starttime;
 uint32_t pause_time;
@@ -316,12 +312,12 @@ bool processing_tcode; // Helper variable to block certain functions while T-cod
   Servo servos[NUM_SERVOS];
 #endif
 
-bool target_direction;
+static bool target_direction;
 
 //Insert variables if CHDK is defined
 #ifdef CHDK
-unsigned long chdkHigh = 0;
-bool chdkActive = false;
+static uint32_t chdkHigh = 0;
+static bool chdkActive = false;
 #endif
 
 //! @name RAM save/restore printing
@@ -411,8 +407,8 @@ static void temp_compensation_apply();
 static uint8_t get_PRUSA_SN(char* SN);
 #endif //PRUSA_SN_SUPPORT
 
-uint16_t gcode_in_progress = 0;
-uint16_t mcode_in_progress = 0;
+static uint16_t gcode_in_progress = 0;
+static uint16_t mcode_in_progress = 0;
 
 void serial_echopair_P(const char *s_P, float v)
     { serialprintPGM(s_P); SERIAL_ECHO(v); }
@@ -623,8 +619,7 @@ void crashdet_detected(uint8_t mask)
         lcd_print(msg);
 
         // ask whether to resume printing
-        lcd_set_cursor(0, 1);
-        lcd_puts_P(_T(MSG_RESUME_PRINT));
+        lcd_puts_at_P(0, 1, _T(MSG_RESUME_PRINT));
         lcd_putc('?');
         uint8_t yesno = lcd_show_yes_no_and_wait(false);
 		if (yesno == LCD_LEFT_BUTTON_CHOICE)
@@ -876,17 +871,11 @@ static void check_if_fw_is_on_right_printer() {
 uint8_t check_printer_version()
 {
 	uint8_t version_changed = 0;
-	uint16_t printer_type = eeprom_read_word((uint16_t*)EEPROM_PRINTER_TYPE);
-	uint16_t motherboard = eeprom_read_word((uint16_t*)EEPROM_BOARD_TYPE);
+	uint16_t printer_type = eeprom_init_default_word((uint16_t*)EEPROM_PRINTER_TYPE, PRINTER_TYPE);
+	uint16_t motherboard = eeprom_init_default_word((uint16_t*)EEPROM_BOARD_TYPE, MOTHERBOARD);
 
-	if (printer_type != PRINTER_TYPE) {
-		if (printer_type == 0xffff) eeprom_write_word((uint16_t*)EEPROM_PRINTER_TYPE, PRINTER_TYPE);
-		else version_changed |= 0b10;
-	}
-	if (motherboard != MOTHERBOARD) {
-		if(motherboard == 0xffff) eeprom_write_word((uint16_t*)EEPROM_BOARD_TYPE, MOTHERBOARD);
-		else version_changed |= 0b01;
-	}
+	if (printer_type != PRINTER_TYPE) version_changed |= 0b10;
+	if (motherboard != MOTHERBOARD) version_changed |= 0b01;
 	return version_changed;
 }
 
@@ -1035,6 +1024,19 @@ static void fw_crash_init()
 
     // prevent crash prompts to reappear once acknowledged
     eeprom_update_byte((uint8_t*)EEPROM_FW_CRASH_FLAG, 0xFF);
+}
+
+#define KILL_PENDING_FLAG 0x42
+
+static void fw_kill_init() {
+    if (eeprom_read_byte((uint8_t*)EEPROM_KILL_PENDING_FLAG) == KILL_PENDING_FLAG) {
+        // clear pending message event
+        eeprom_write_byte((uint8_t*)EEPROM_KILL_PENDING_FLAG, EEPROM_EMPTY_VALUE);
+
+        // display the kill message
+        PGM_P kill_msg = (PGM_P)eeprom_read_word((uint16_t*)EEPROM_KILL_MESSAGE);
+        lcd_show_fullscreen_message_and_wait_P(kill_msg);
+    }
 }
 
 
@@ -1344,6 +1346,9 @@ void setup()
     if (!xflash_success)
         xflash_err_msg();
 
+    // report kill() events
+    fw_kill_init();
+
 #ifdef FILAMENT_SENSOR
     fsensor.init();
 #endif //FILAMENT_SENSOR
@@ -1462,11 +1467,7 @@ void setup()
 
 	//mbl_mode_init();
 	mbl_settings_init();
-	SilentModeMenu_MMU = eeprom_read_byte((uint8_t*)EEPROM_MMU_STEALTH);
-	if (SilentModeMenu_MMU == 255) {
-		SilentModeMenu_MMU = 1;
-		eeprom_write_byte((uint8_t*)EEPROM_MMU_STEALTH, SilentModeMenu_MMU);
-	}
+	eeprom_init_default_byte((uint8_t*)EEPROM_MMU_STEALTH, 1);
 
 #if !defined(DEBUG_DISABLE_FANCHECK) && defined(FANCHECK) && defined(TACH_1) && TACH_1 >-1
 	setup_fan_interrupt();
@@ -1583,15 +1584,6 @@ void setup()
 
 #ifdef UVLO_SUPPORT
   if (eeprom_read_byte((uint8_t*)EEPROM_UVLO) != 0) { //previous print was terminated by UVLO
-/*
-	  if (!lcd_show_fullscreen_message_yes_no_and_wait_P(_T(MSG_RECOVER_PRINT), false))	recover_print();
-	  else {
-		  eeprom_update_byte((uint8_t*)EEPROM_UVLO, 0);
-		  lcd_update_enable(true);
-		  lcd_update(2);
-		  lcd_setstatuspgm(MSG_WELCOME);
-	  }
-*/
       manage_heater(); // Update temperatures 
 #ifdef DEBUG_UVLO_AUTOMATIC_RECOVER 
 		printf_P(_N("Power panic detected!\nCurrent bed temp:%d\nSaved bed temp:%d\n"), (int)degBed(), eeprom_read_byte((uint8_t*)EEPROM_UVLO_TARGET_BED));
@@ -5228,18 +5220,13 @@ void process_commands()
     case 1: {
         const char *src = strchr_pointer + 2;
         codenum = 0;
-        bool hasP = false, hasS = false;
-        if (code_seen('P')) {
-            codenum = code_value_long(); // milliseconds to wait
-            hasP = codenum > 0;
-        }
-        if (code_seen('S')) {
-            codenum = code_value_long() * 1000; // seconds to wait
-            hasS = codenum > 0;
-        }
+        if (code_seen('P')) codenum = code_value_long(); // milliseconds to wait
+        if (code_seen('S')) codenum = code_value_long() * 1000; // seconds to wait
+        bool expiration_time_set = bool(codenum);
+
         while (*src == ' ') ++src;
         custom_message_type = CustomMsg::M0Wait;
-        if (!hasP && !hasS && *src != '\0') {
+        if (!expiration_time_set && *src != '\0') {
             lcd_setstatus(src);
         } else {
             // farmers want to abuse a bug from the previous firmware releases
@@ -5251,20 +5238,20 @@ void process_commands()
                 custom_message_type = CustomMsg::Status; // let the lcd display the name of the printed G-code file in farm mode
             }
         }
-        lcd_ignore_click();				//call lcd_ignore_click also for else ???
         st_synchronize();
+        menu_set_block(MENU_BLOCK_STATUS_SCREEN_M0);
         previous_millis_cmd.start();
-        if (codenum > 0 ) {
+        if (expiration_time_set) {
             codenum += _millis();  // keep track of when we started waiting
             KEEPALIVE_STATE(PAUSED_FOR_USER);
             while(_millis() < codenum && !lcd_clicked()) {
                 delay_keep_alive(0);
             }
             KEEPALIVE_STATE(IN_HANDLER);
-            lcd_ignore_click(false);
         } else {
             marlin_wait_for_click();
         }
+        menu_unset_block(MENU_BLOCK_STATUS_SCREEN_M0);
         if (IS_SD_PRINTING)
             custom_message_type = CustomMsg::Status;
         else
@@ -5974,7 +5961,7 @@ Sigma_Exit:
     It is processed much earlier as to bypass the cmdqueue.
     */
     case 112: 
-      kill(MSG_M112_KILL, 3);
+      kill(MSG_M112_KILL);
       break;
 
     /*!
@@ -6460,10 +6447,9 @@ Sigma_Exit:
           SERIAL_ECHOPGM(" based on Marlin FIRMWARE_URL:https://github.com/prusa3d/Prusa-Firmware PROTOCOL_VERSION:");
           SERIAL_ECHOPGM(PROTOCOL_VERSION);
           SERIAL_ECHOPGM(" MACHINE_TYPE:");
-          SERIAL_ECHOPGM(CUSTOM_MENDEL_NAME); 
-          SERIAL_ECHOPGM(" EXTRUDER_COUNT:"); 
-          SERIAL_ECHOPGM(STRINGIFY(EXTRUDERS)); 
-          SERIAL_ECHOPGM(" UUID:"); 
+          SERIAL_ECHOPGM(CUSTOM_MENDEL_NAME);
+          SERIAL_ECHOPGM(" EXTRUDER_COUNT:" STRINGIFY(EXTRUDERS));
+          SERIAL_ECHOPGM(" UUID:");
           SERIAL_ECHOLNPGM(MACHINE_UUID);
 #ifdef EXTENDED_CAPABILITIES_REPORT
           extended_capabilities_report();
@@ -7504,7 +7490,7 @@ Sigma_Exit:
     {
 		lang_reset();
         SERIAL_ECHO_START;
-        SERIAL_PROTOCOLPGM(("LANG SEL FORCED"));
+        SERIAL_PROTOCOLPGM("LANG SEL FORCED");
     }
     break;
     #ifdef ABORT_ON_ENDSTOP_HIT_FEATURE_ENABLED
@@ -8378,6 +8364,7 @@ Sigma_Exit:
     }
     break;
 
+#ifndef TMC2130
     /*!
 	### M351 - Toggle Microstep Pins <a href="https://reprap.org/wiki/G-code#M351:_Toggle_MS1_MS2_pins_directly">M351: Toggle MS1 MS2 pins directly</a>
     Toggle MS1 MS2 pins directly.
@@ -8411,6 +8398,7 @@ Sigma_Exit:
       #endif
     }
     break;
+#endif // !TMC2130
 
     /*!
     ### M701 - Load filament to extruder <a href="https://reprap.org/wiki/G-code#M701:_Load_filament">M701: Load filament</a>
@@ -8634,13 +8622,13 @@ Sigma_Exit:
   // end if(code_seen('M')) (end of M codes)
   /*!
   -----------------------------------------------------------------------------------------
-  # T Codes
-  T<extruder nr.> - select extruder in case of multi extruder printer. select filament in case of MMU_V2.
-  #### For MMU_V2:
-  T<n> Gcode to extrude at least 38.10 mm at feedrate 19.02 mm/s must follow immediately to load to extruder wheels.
-  @n T? Gcode to extrude shouldn't have to follow, load to extruder wheels is done automatically
-  @n Tx Same as T?, except nozzle doesn't have to be preheated. Tc must be placed after extruder nozzle is preheated to finish filament load.
-  @n Tc Load to nozzle after filament was prepared by Tc and extruder nozzle is already heated.
+  T<extruder nr.> - select extruder in case of multi extruder printer. Selects filament position 1-5 (T0-T4) in case of MMU.
+
+  For MMU2/S / MMU3:
+    T<extruder nr.> - Selects the filament position. A Gcode to load a filament to the nozzle must follow.
+    Tx - Printer asks user to select a filament position. Then loads the filament from the MMU unit into the extruder wheels only. G-code to heat up the nozzle follows.
+    Tc - Loads the filament tip from the extruder wheels into the nozzle.
+    T? - acts the same as Tx followed by Tc
   */
   else if(*CMDBUFFER_CURRENT_STRING == 'T') {
         strchr_pointer = CMDBUFFER_CURRENT_STRING;
@@ -9138,11 +9126,10 @@ void update_currents() {
 #endif //MOTHERBOARD == BOARD_RAMBO_MINI_1_0 || MOTHERBOARD == BOARD_RAMBO_MINI_1_3
 
 void get_coordinates() {
-  bool seen[4]={false,false,false,false};
-  for(int8_t i=0; i < NUM_AXIS; i++) {
+  for (uint8_t i = X_AXIS, mask = X_AXIS_MASK; i < NUM_AXIS; i++, mask <<= 1) {
     if(code_seen(axis_codes[i]))
     {
-      bool relative = axis_relative_modes & (1 << i);
+      bool relative = axis_relative_modes & mask;
       destination[i] = code_value();
       if (i == E_AXIS) {
         float emult = extruder_multiplier[active_extruder];
@@ -9156,7 +9143,6 @@ void get_coordinates() {
       }
       if (relative)
         destination[i] += current_position[i];
-      seen[i]=true;
 #if MOTHERBOARD == BOARD_RAMBO_MINI_1_0 || MOTHERBOARD == BOARD_RAMBO_MINI_1_3
 	  if (i == Z_AXIS && SilentModeMenu == SILENT_MODE_AUTO) update_currents();
 #endif //MOTHERBOARD == BOARD_RAMBO_MINI_1_0 || MOTHERBOARD == BOARD_RAMBO_MINI_1_3
@@ -9166,11 +9152,6 @@ void get_coordinates() {
   if(code_seen('F')) {
     next_feedrate = code_value();
     if(next_feedrate > 0.0) feedrate = next_feedrate;
-	if (!seen[0] && !seen[1] && !seen[2] && seen[3])
-	{
-//		float e_max_speed = 
-//		printf_P(PSTR("E MOVE speed %7.3f\n"), feedrate / 60)
-	}
   }
 }
 
@@ -9380,7 +9361,7 @@ void manage_inactivity(bool ignore_stepper_queue/*=false*/) //default argument s
 
   if(previous_millis_cmd.expired(max_inactive_time))
     if(max_inactive_time)
-      kill(_n("Inactivity Shutdown"), 4);
+      kill(PSTR("Inactivity Shutdown"));
   if(stepper_inactive_time)  {
     if(previous_millis_cmd.expired(stepper_inactive_time))
     {
@@ -9421,7 +9402,7 @@ void manage_inactivity(bool ignore_stepper_queue/*=false*/) //default argument s
     // ----------------------------------------------------------------
     if ( killCount >= KILL_DELAY)
     {
-       kill(NULL, 5);
+       kill();
     }
   #endif
     
@@ -9450,6 +9431,9 @@ void manage_inactivity(bool ignore_stepper_queue/*=false*/) //default argument s
   check_axes_activity();
   MMU2::mmu2.mmu_loop();
 
+  lcd_knob_update();
+  backlight_update();
+
   // handle longpress
   if(lcd_longpress_trigger)
   {
@@ -9467,49 +9451,31 @@ void manage_inactivity(bool ignore_stepper_queue/*=false*/) //default argument s
   host_keepalive();
 }
 
-void kill(const char *full_screen_message, unsigned char id)
-{
-	printf_P(_N("KILL: %d\n"), id);
-	//return;
-  cli(); // Stop interrupts
-  disable_heater();
+void kill(const char *full_screen_message) {
+    cli(); // Stop interrupts
+    disable_heater();
 
-  disable_x();
-//  SERIAL_ECHOLNPGM("kill - disable Y");
-  disable_y();
-  poweroff_z();
-  disable_e0();
-  disable_e1();
-  disable_e2();
+    disable_x();
+    disable_y();
+    poweroff_z();
+    disable_e0();
+    disable_e1();
+    disable_e2();
 
-#if defined(PS_ON_PIN) && PS_ON_PIN > -1
-  pinMode(PS_ON_PIN,INPUT);
-#endif
-  SERIAL_ERROR_START;
-  SERIAL_ERRORLNRPGM(_n("Printer halted. kill() called!"));////MSG_ERR_KILLED
-  if (full_screen_message != NULL) {
-      SERIAL_ERRORLNRPGM(full_screen_message);
-      lcd_display_message_fullscreen_P(full_screen_message);
-  } else {
-      LCD_ALERTMESSAGERPGM(_n("KILLED. "));////MSG_KILLED
-  }
+    SERIAL_ERROR_START;
+    SERIAL_ERRORLNRPGM(PSTR("Printer halted. kill() called!"));
 
-  // FMC small patch to update the LCD before ending
-  sei();   // enable interrupts
-  for ( int i=5; i--; lcd_update(0))
-  {
-     _delay(200);	
-  }
-  cli();   // disable interrupts
-  suicide();
-  while(1)
-  {
-#ifdef WATCHDOG
-    wdt_reset();
-#endif //WATCHDOG
-	  /* Intentionally left empty */
-	
-  } // Wait for reset
+    if (full_screen_message != NULL) {
+        SERIAL_ERRORLNRPGM(full_screen_message);
+    } else {
+        full_screen_message = PSTR("KILLED.");
+    }
+
+    // update eeprom with the correct kill message to be shown on startup
+    eeprom_write_word((uint16_t*)EEPROM_KILL_MESSAGE, (uint16_t)full_screen_message);
+    eeprom_write_byte((uint8_t*)EEPROM_KILL_PENDING_FLAG, KILL_PENDING_FLAG);
+
+    softReset();
 }
 
 void UnconditionalStop()
@@ -11154,11 +11120,11 @@ void restore_extruder_temperature_from_ram() {
 //! @param e_move
 void restore_print_from_ram_and_continue(float e_move)
 {
-	if (!saved_printing) return;
-	
+    if (!saved_printing) return;
+
 #ifdef FANCHECK
-	// Do not allow resume printing if fans are still not ok
-	if ((fan_check_error != EFCE_OK) && (fan_check_error != EFCE_FIXED)) return;
+    // Do not allow resume printing if fans are still not ok
+    if (fan_check_error == EFCE_REPORTED) return;
     if (fan_check_error == EFCE_FIXED) fan_check_error = EFCE_OK; //reenable serial stream processing if printing from usb
 #endif
 

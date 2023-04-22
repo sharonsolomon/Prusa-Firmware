@@ -6,7 +6,6 @@
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 
-//-//
 #include <avr/pgmspace.h>
 extern const uint16_t _nPrinterType;
 extern const char _sPrinterName[] PROGMEM;
@@ -93,6 +92,9 @@ extern const char _sPrinterMmuName[] PROGMEM;
 
 // This determines the communication speed of the printer
 #define BAUDRATE 115200
+
+// Enable g-code compression (see https://github.com/scottmudge/OctoPrint-MeatPack)
+#define ENABLE_MEATPACK
 
 // This enables the serial port associated to the Bluetooth interface
 //#define BTENABLED              // Enable BT interface on AT90USB devices

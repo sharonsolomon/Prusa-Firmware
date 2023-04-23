@@ -119,7 +119,6 @@ def fix_executable_permissions(dependency, installation_directory):
 
 def recommended_version_is_available(dependency):
     version = dependencies[dependency]['version']
-    print(version)
     directory = directory_for_dependency(dependency, version)
     return directory.exists() and directory.is_dir()
 
@@ -198,40 +197,6 @@ def main() -> int:
 
     return 0
 
-def main() -> int:
-    parser = ArgumentParser()
-    # yapf: disable
-    parser.add_argument(
-        '--print-dependency-version', type=str,
-        help='Prints recommended version of given dependency and exits.')
-    parser.add_argument(
-        '--print-dependency-directory', type=str,
-        help='Prints installation directory of given dependency and exits.')
-    args = parser.parse_args(sys.argv[1:])
-    # yapf: enable
-
-    if args.print_dependency_version:
-        try:
-            print(get_dependency_version(args.print_dependency_version))
-            return 0
-        except KeyError:
-            print('Unknown dependency "%s"' % args.print_dependency_version)
-            return 1
-
-    if args.print_dependency_directory:
-        try:
-            print(get_dependency_directory(args.print_dependency_directory))
-            return 0
-        except KeyError:
-            print('Unknown dependency "%s"' % args.print_dependency_directory)
-            return 1
-
-    # if no argument present, check and install dependencies
-    for dependency in dependencies:
-        if recommended_version_is_available(dependency):
-            continue
-        install_dependency(dependency)
-    return 0
 
 if __name__ == "__main__":
     sys.exit(main())

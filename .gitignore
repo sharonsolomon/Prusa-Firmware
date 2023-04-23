@@ -34,3 +34,5 @@ CMakeCache.txt
 cmake_install.cmake
 
 build.ninja
+.dependencies
+*.json

@@ -8,9 +8,10 @@
   *------------------------------------*/
 
  // Printer revision
-
+ //SPECIAL EDITION
  #define PRINTER_TYPE PRINTER_MK2
- #define PRINTER_NAME PRINTER_MK24_NAME
+ #define PRINTER_NAME PRINTER_MK2_NAME
+ #define PRINTER_NAME_ALTERNATE PRINTER_MK25_NAME //the other similar printer to this.
  #define PRINTER_MMU_TYPE PRINTER_MK25_MMU2
  #define PRINTER_MMU_NAME PRINTER_MK25_MMU2_NAME
  #define FILAMENT_SIZE "1_75mm_MK2S"
@@ -99,8 +100,10 @@
  #define DEFAULT_MAX_ACCELERATION_SILENT     {960, 960, 200, 5000}    // (mm/sec^2) max acceleration (M201), silent mode
 
 
+
  #define DEFAULT_ACCELERATION          1250   // X, Y, Z and E max acceleration in mm/s^2 for printing moves (M204S)
  #define DEFAULT_RETRACT_ACCELERATION  1250   // X, Y, Z and E max acceleration in mm/s^2 for retracts (M204T)
+ #define DEFAULT_TRAVEL_ACCELERATION   1250   // X, Y, Z and E max acceleration in mm/s^2 for travels (M204T)
 
  #define MANUAL_FEEDRATE {2700, 2700, 1000, 100}   // set the speeds for manual moves (mm/min)
 
@@ -124,8 +127,18 @@
  #define DEFAULT_SAFETYTIMER_TIME_MINS 30
  #define FARM_DEFAULT_SAFETYTIMER_TIME_ms (45*60*1000ul)
 
+ // Online crash dumper
+ #define EMERGENCY_SERIAL_DUMP   // Request dump via serial on stack corruption and WDR
+ #define MENU_SERIAL_DUMP        // Enable "Memory dump" in Settings menu
+
  // Filament sensor
  #define FILAMENT_SENSOR
+
+ //FLAGFLAG
+ #define FILAMENT_SENSOR_TYPE FSENSOR_PAT9125
+ #define FSENSOR_PROBING
+ //ENDFLAGFLAG
+
  //#define IR_SENSOR
 
  #define DEBUG_DCODE2
@@ -224,18 +237,6 @@
  #define FANCHECK_AUTO_PRINT_FAN_THRS 70 //[RPS] - Used during selftest to identify swapped fans automatically
  #define FANCHECK_AUTO_FAIL_THRS 20 //[RPS] - Used during selftest to identify a faulty fan
 
- /*------------------------------------
-  LOAD/UNLOAD FILAMENT SETTINGS
-  *------------------------------------*/
-
- // Load filament commands
- #define LOAD_FILAMENT_0 "M83"
- #define LOAD_FILAMENT_1 "G1 E70 F400"
- #define LOAD_FILAMENT_2 "G1 E40 F100"
-
- // Unload filament commands
- #define UNLOAD_FILAMENT_0 "M83"
- #define UNLOAD_FILAMENT_1 "G1 E-80 F7000"
 
  /*------------------------------------
   CHANGE FILAMENT SETTINGS
@@ -281,6 +282,8 @@
 
  #define TEMP_RUNAWAY_EXTRUDER_HYSTERESIS 15
  #define TEMP_RUNAWAY_EXTRUDER_TIMEOUT 45
+
+
 
  /*------------------------------------
   MOTOR CURRENT SETTINGS
@@ -394,6 +397,9 @@
  #define PLA_PREHEAT_HOTEND_TEMP 215
  #define PLA_PREHEAT_HPB_TEMP 60
 
+ #define PVB_PREHEAT_HOTEND_TEMP 215
+ #define PVB_PREHEAT_HPB_TEMP 75
+
  #define ASA_PREHEAT_HOTEND_TEMP 260
  #define ASA_PREHEAT_HPB_TEMP 105
 
@@ -405,6 +411,9 @@
 
  #define HIPS_PREHEAT_HOTEND_TEMP 220
  #define HIPS_PREHEAT_HPB_TEMP 100
+
+ #define PA_PREHEAT_HOTEND_TEMP 275
+ #define PA_PREHEAT_HPB_TEMP 90
 
  #define PP_PREHEAT_HOTEND_TEMP 254
  #define PP_PREHEAT_HPB_TEMP 100
@@ -475,6 +484,7 @@
  #define TEMP_SENSOR_PINDA 1
 
  #define STACK_GUARD_TEST_VALUE 0xA2A2
+ #define STACK_GUARD_MARGIN     32
 
  #define MAX_BED_TEMP_CALIBRATION 50
  #define MAX_HOTEND_TEMP_CALIBRATION 50
@@ -518,9 +528,18 @@
  //#define SUPPORT_VERBOSITY
 
  #define MMU_REQUIRED_FW_BUILDNR 132
+
+ #define MMU_CONFIG_FILE "mmu2/variants/config_MMU2S.h"
+ #define MMU_FILAMENT_COUNT 5
  #define MMU_FORCE_STEALTH_MODE
  #define MMU_DEBUG //print communication between MMU2 and printer on serial
  #define MMU_HAS_CUTTER
+
+ // MMU Error pause position
+ #define MMU_ERR_X_PAUSE_POS 125
+ #define MMU_ERR_Y_PAUSE_POS 0
+ #define MMU_ERR_Z_PAUSE_LIFT 20
+
 
  // This is experimental feature requested by our test department.
  // There is no known use for ordinary user. If enabled by this macro
@@ -530,5 +549,18 @@
 
  //#define MMU_ALWAYS_CUT
  #define MMU_IDLER_SENSOR_ATTEMPTS_NR 21 //max. number of attempts to load filament if first load failed; value for max bowden length and case when loading fails right at the beginning
+
+
+ // Default Arc Interpolation Settings (Now configurable via M214)
+ #define DEFAULT_N_ARC_CORRECTION       25 // Number of interpolated segments between corrections.
+ /* A value of 1 or less for N_ARC_CORRECTION will trigger the use of Sin and Cos for every arc, which will improve accuracy at the
+   cost of performance*/
+ #define DEFAULT_MM_PER_ARC_SEGMENT     1.0f // REQUIRED - The enforced maximum length of an arc segment
+ #define DEFAULT_MIN_MM_PER_ARC_SEGMENT 0.5f //the enforced minimum length of an interpolated segment
+   /*  MIN_MM_PER_ARC_SEGMENT Must be smaller than MM_PER_ARC_SEGMENT.  Only has an effect if MIN_ARC_SEGMENTS > 0
+       or ARC_SEGMENTS_PER_SEC > 0 .  If both MIN_ARC_SEGMENTS and ARC_SEGMENTS_PER_SEC is defined, the minimum
+       calculated segment length is used. */
+ #define DEFAULT_MIN_ARC_SEGMENTS 20 // The enforced minimum segments in a full circle of the same radius.  Set to 0 to disable
+ #define DEFAULT_ARC_SEGMENTS_PER_SEC 0 // Use feedrate to choose segment length. Set to 0 to disable
 
  #endif //__CONFIGURATION_PRUSA_H

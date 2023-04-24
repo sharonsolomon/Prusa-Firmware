@@ -23,6 +23,7 @@ The workflow should be pretty straightforward for anyone with development experi
 
     # automatically setup dependencies
     ./utils/bootstrap.py
+    PATH="/Applications/CMake.app/Contents/bin":"$PATH"
 
     # configure and build
     mkdir build

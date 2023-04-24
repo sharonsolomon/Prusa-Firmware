@@ -73,6 +73,7 @@ const char MSG_PAPER[] PROGMEM_I1 = ISTR("Place a sheet of paper under the nozzl
 const char MSG_PAUSE_PRINT[] PROGMEM_I1 = ISTR("Pause print");////MSG_PAUSE_PRINT c=18
 #ifdef STEEL_SHEET
 const char MSG_PLACE_STEEL_SHEET[] PROGMEM_I1 = ISTR("Please place steel sheet on heatbed."); ////MSG_PLACE_STEEL_SHEET c=20 r=4#endif
+#endif
 const char MSG_PLEASE_WAIT[] PROGMEM_I1 = ISTR("Please wait"); ////MSG_PLEASE_WAIT c=20
 const char MSG_POWER_FAILURES[] PROGMEM_I1 = ISTR("Power failures"); ////MSG_POWER_FAILURES c=15
 const char MSG_PREHEAT_NOZZLE[] PROGMEM_I1 = ISTR("Preheat the nozzle!"); ////MSG_PREHEAT_NOZZLE c=20

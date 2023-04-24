@@ -4717,8 +4717,9 @@ void process_commands()
             break;
         }
         lcd_show_fullscreen_message_and_wait_P(_i("Stable ambient temperature 21-26C is needed a rigid stand is required."));////MSG_TEMP_CAL_WARNING c=20 r=4
+        #ifdef STEEL_SHEET
         uint8_t result = lcd_show_fullscreen_message_yes_no_and_wait_P(_T(MSG_STEEL_SHEET_CHECK), false);
-
+        
         if (result == LCD_LEFT_BUTTON_CHOICE)
         {
             current_position[Z_AXIS] = MESH_HOME_Z_SEARCH;
@@ -4735,6 +4736,7 @@ void process_commands()
             gcode_G28(false, false, true);
 
         }
+        #endif
         if ((current_temperature_pinda > 35) && (farm_mode == false)) {
             //waiting for PIDNA probe to cool down in case that we are not in farm mode
             current_position[Z_AXIS] = 100;

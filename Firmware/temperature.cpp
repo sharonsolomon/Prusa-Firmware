@@ -2191,9 +2191,9 @@ static void check()
     uint8_t heater_pwm = soft_pwm[0];
     uint8_t fan_pwm = soft_pwm_fan;
     float heater_temp = current_temperature_isr[0];
-#ifdef AMBIENT_THERMISTOR
+//#ifdef AMBIENT_THERMISTOR
     float ambient_temp = current_temperature_ambient_isr;
-#endif
+//#endif
 
     // check if a reset is required to seed the model: this needs to be done with valid
     // ADC values, so we can't do that directly in init()
@@ -2290,9 +2290,9 @@ static void log_isr()
     log_buf.entry.delta_ms = delta_ms;
     log_buf.entry.cur_pwm = soft_pwm[0];
     log_buf.entry.cur_temp = current_temperature_isr[0];
-#ifdef AMBIENT_THERMISTOR
+//#ifdef AMBIENT_THERMISTOR
     log_buf.entry.cur_amb = current_temperature_ambient_isr;
-#endif
+//#endif
 }
 #endif
 
@@ -2506,9 +2506,9 @@ static void cooldown(float temp)
     set_fan_speed(255);
     while(current_temperature[0] >= temp) {
         if(temp_error_state.v) break;
-        #ifdef AMBIENT_THERMISTOR
+        //#ifdef AMBIENT_THERMISTOR
         float ambient = current_temperature_ambient + temp_model::data.Ta_corr;
-        #endif
+        //#endif
         if(current_temperature[0] < (ambient + TEMP_HYSTERESIS)) {
             // do not get stuck waiting very close to ambient temperature
             break;

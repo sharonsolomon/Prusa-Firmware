@@ -283,9 +283,6 @@ static float offset[3] = {0.0, 0.0, 0.0};
 // Current feedrate
 float feedrate = 1500.0;
 
-// Feedrate for the next move
-static float next_feedrate;
-
 // Original feedrate saved during homing moves
 static float saved_feedrate;
 
@@ -545,8 +542,16 @@ bool check_fsensor() {
 bool __attribute__((noinline)) babystep_allowed() {
     return ( !homing_flag
         && !mesh_bed_leveling_flag
-        && ( lcd_commands_type == LcdCommands::Layer1Cal || ( blocks_queued() && !isPrintPaused && printJobOngoing() && (current_position[Z_AXIS] < Z_HEIGHT_HIDE_LIVE_ADJUST_MENU)))
+        && !isPrintPaused
+        && ((lcd_commands_type == LcdCommands::Layer1Cal && CHECK_ALL_HEATERS)
+            || printJobOngoing()
+            || lcd_commands_type == LcdCommands::Idle
+        )
     );
+}
+
+bool __attribute__((noinline)) babystep_allowed_strict() {
+    return ( babystep_allowed() && current_position[Z_AXIS] < Z_HEIGHT_HIDE_LIVE_ADJUST_MENU);
 }
 
 bool fans_check_enabled = true;
@@ -3524,12 +3529,6 @@ static void gcode_M600(bool automatic, float x_position, float y_position, float
                     MMU2::mmu2.eject_filament(MMU2::mmu2.get_current_tool(), false);
                 }
                 mmu_M600_wait_and_beep();
-                if (saved_printing) {
-                    lcd_clear();
-                    lcd_puts_at_P(0, 2, _T(MSG_PLEASE_WAIT));
-//@@TODO                mmu_command(MmuCmd::R0);
-//                manage_response(false, false);
-                }
             }
             mmu_M600_load_filament(automatic, HotendTempBckp);
         }
@@ -3575,8 +3574,10 @@ void gcode_M701(float fastLoadLength, uint8_t mmuSlotIndex){
     
     prusa_statistics(22);
 
-    if (MMU2::mmu2.Enabled() && mmuSlotIndex < MMU_FILAMENT_COUNT) {
-        MMU2::mmu2.load_filament_to_nozzle(mmuSlotIndex);
+    if (MMU2::mmu2.Enabled()) {
+        if (mmuSlotIndex < MMU_FILAMENT_COUNT) {
+          MMU2::mmu2.load_filament_to_nozzle(mmuSlotIndex);
+        } // else do nothing
     } else {
         custom_message_type = CustomMsg::FilamentLoading;
         lcd_setstatuspgm(_T(MSG_LOADING_FILAMENT));
@@ -8401,13 +8402,13 @@ Sigma_Exit:
     - `P` - n index of MMU slot (zero based, so 0-4 like T0 and T4)
     - `T` - Alias of `P`. Used for compatibility with Marlin
     - `L` - Extrude distance for insertion (positive value)(manual reload)
-    - `Z` - Move the Z axis by this distance. Default value MIN_Z_FOR_LOAD
+    - `Z` - Move the Z axis by this distance. Default value is 0 to maintain backwards compatibility with older gcodes.
     */
     case 701:
     {
         uint8_t mmuSlotIndex = 0xffU;
         float fastLoadLength = FILAMENTCHANGE_FIRSTFEED; // Only used without MMU
-        float z_target = MIN_Z_FOR_LOAD;
+        float z_target = 0;
         if( MMU2::mmu2.Enabled() )
         {
             if( code_seen('P') || code_seen('T') ) {
@@ -8419,6 +8420,7 @@ Sigma_Exit:
 
         // Z lift. For safety only allow positive values
         if (code_seen('Z')) z_target = fabs(code_value());
+        else raise_z_above(MIN_Z_FOR_LOAD); // backwards compatibility for 3.12 and older FW
 
         // Raise the Z axis
         float delta = raise_z(z_target);
@@ -8439,16 +8441,17 @@ Sigma_Exit:
     
     #### Parameters
     - `U` - Retract distance for removal (manual reload). Default value is 0.
-    - `Z` - Move the Z axis by this distance. Default value MIN_Z_FOR_UNLOAD.
+    - `Z` - Move the Z axis by this distance. Default value is 0 to maintain backwards compatibility with older gcodes.
     */
     case 702:
     {
-        float z_target = MIN_Z_FOR_UNLOAD;
+        float z_target = 0;
         float unloadLength = FILAMENTCHANGE_FINALRETRACT;
         if (code_seen('U')) unloadLength = code_value();
 
         // For safety only allow positive values
         if (code_seen('Z')) z_target = fabs(code_value());
+        else raise_z_above(MIN_Z_FOR_UNLOAD); // backwards compatibility for 3.12 and older FW
 
         // Raise the Z axis
         float delta = raise_z(z_target);
@@ -9140,8 +9143,8 @@ void get_coordinates() {
     else destination[i] = current_position[i]; //Are these else lines really needed?
   }
   if(code_seen('F')) {
-    next_feedrate = code_value();
-    if(next_feedrate > 0.0) feedrate = next_feedrate;
+    const float next_feedrate = code_value();
+    if(next_feedrate > 0.f) feedrate = next_feedrate;
   }
 }
 
